@@ -22,7 +22,11 @@ export interface Marca {
   marcaDagua?: string;
   qrWhatsapp?: string;
   qrInstagram?: string;
-  fraseEncerramento?: string;
+  cabecalhoNome?: string; // ex.: MATHEUS PALHARES
+  cabecalhoSub?: string; // ex.: ARQUITETURA + INTERIORES
+  assinaturaNome?: string; // ex.: Matheus Palhares
+  assinaturaTitulo?: string; // ex.: Arquiteto e Urbanista
+  logoBranco?: string;
 }
 
 export interface Empresa {
@@ -77,8 +81,18 @@ export interface Projeto {
 
 export interface EtapaProposta {
   titulo: string;
+  itens: string[]; // o que acontece na etapa
+  prazo: string; // opcional: só aparece se preenchido
+}
+
+export interface ItemEscopo {
+  titulo: string;
   descricao: string;
-  prazo: string; // vazio = a definir
+}
+
+export interface Diferencial {
+  titulo: string;
+  texto: string;
 }
 
 export interface ItemExtra {
@@ -86,17 +100,23 @@ export interface ItemExtra {
   valor: number | null;
 }
 
+export type PerfilProposta = "comercial" | "residencial" | "";
+
 export interface DadosProposta {
+  perfil: PerfilProposta; // para quem é: define os textos de partida
   clienteNome: string;
-  objetivo: string;
+  objetivo: string; // "Projeto" na capa
   tipoContratacao: string;
   obra: string;
   local: string;
   data: string; // AAAA-MM-DD
   validadeDias: number | null;
+  fraseCapa: string;
+  tituloApresentacao: string;
+  saudacao: string; // vazio = "Olá, <cliente>."
   carta: string;
-  porQueInvestir: string;
-  escopo: string[];
+  diferenciais: Diferencial[]; // "Por que investir em um bom projeto" (sem preço)
+  escopo: ItemEscopo[];
   etapas: EtapaProposta[];
   valorTotal: number | null;
   descontoAVista: number; // %
@@ -105,6 +125,8 @@ export interface DadosProposta {
   observacoes: string;
   itensExtras: ItemExtra[];
   termos: string[];
+  missao: string;
+  proximosPassos: string[];
 }
 
 export interface Verificacao {

@@ -2,9 +2,9 @@
 import { useState, useTransition } from "react";
 import { salvarEGerarProposta, salvarProposta } from "@/app/acoes";
 import { calcularPagamento, errosProposta, pendenciasProposta } from "@/lib/documentos/regras-proposta";
-import { TIPOS_CONTRATACAO } from "@/lib/documentos/textos-proposta";
+import { TIPOS_CONTRATACAO, textosDoPerfil } from "@/lib/documentos/textos-proposta";
 import { dataBR, moeda, somarDias, temTravessao } from "@/lib/formato";
-import type { DadosProposta, Proposta, Verificacao } from "@/lib/tipos";
+import type { DadosProposta, PerfilProposta, Proposta, Verificacao } from "@/lib/tipos";
 import { Calculo } from "./ui";
 
 const paraNumero = (v: string): number | null => { if (!v.trim()) return null; const n = Number(v.replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
@@ -36,7 +36,14 @@ export function EditorProposta({ proposta, marcaDefinida, sigla }: { proposta: P
   const falta = pendenciasProposta(d);
   const bloqueios = [...errosProposta(d), ...(marcaDefinida ? [] : [`A marca da ${sigla} está a definir. Cadastre em Empresas e marcas para gerar o documento.`])];
   const calc = calcularPagamento(d);
-  const travessao = [d.carta, d.porQueInvestir, d.observacoes, ...d.escopo, ...d.termos].some(temTravessao);
+  const travessao = [d.carta, d.missao, d.observacoes, ...d.termos, ...d.escopo.flatMap((e) => [e.titulo, e.descricao]), ...d.diferenciais.flatMap((e) => [e.titulo, e.texto])].some(temTravessao);
+  const [textosMexidos, setTextosMexidos] = useState(false);
+  const escolherPerfil = (perfil: PerfilProposta) => {
+    if (perfil === d.perfil) return;
+    if (textosMexidos && !window.confirm("Trocar o perfil substitui a carta, os diferenciais, a missão e os próximos passos pelos textos de partida desse perfil. Continuar?")) return;
+    mudar({ perfil, ...textosDoPerfil(perfil) }); setTextosMexidos(false);
+  };
+  const mudarTexto = (patch: Partial<DadosProposta>) => { setTextosMexidos(true); mudar(patch); };
   const nEtapas = d.etapas.filter((e) => e.titulo.trim()).length;
 
   const salvar = () => iniciar(async () => { const r = await salvarProposta(proposta.id, d); if (r.ok) { setSujo(false); setMsg("Rascunho salvo."); setErros([]); } else setErros(r.erros); });
@@ -52,9 +59,16 @@ export function EditorProposta({ proposta, marcaDefinida, sigla }: { proposta: P
       <div className="space-y-4 lg:col-span-2">
         <section className="cartao space-y-3">
           <h2 className="titulo text-sm">1. Cliente e objetivo</h2>
+          <div><span className="rotulo">Para quem é a proposta? {!d.perfil && <span className="adefinir ml-1 normal-case">a definir</span>}</span>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([["comercial", "Comércio ou empresa", "Textos falam do negócio, do fluxo e da marca."], ["residencial", "Residência ou família", "Textos falam da rotina, do lar e do imóvel."]] as const).map(([v, t, sub]) => (
+                <button type="button" key={v} className={"opcao " + (d.perfil === v ? "opcao-ativa" : "")} onClick={() => escolherPerfil(v)}><strong className="block">{t}</strong><span className="text-xs opacity-80">{sub}</span></button>
+              ))}
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block"><span className="rotulo">Nome do cliente</span><input className={"campo" + vazio(d.clienteNome)} value={d.clienteNome} onChange={(e) => mudar({ clienteNome: e.target.value })} /></label>
-            <label className="block"><span className="rotulo">Objetivo (aparece na capa)</span><input className={"campo" + vazio(d.objetivo)} value={d.objetivo} placeholder="Ex.: Projeto de interiores" onChange={(e) => mudar({ objetivo: e.target.value })} /></label>
+            <label className="block"><span className="rotulo">Projeto (aparece na capa)</span><input className={"campo" + vazio(d.objetivo)} value={d.objetivo} placeholder="Ex.: Projeto para ampliação e estruturação comercial" onChange={(e) => mudar({ objetivo: e.target.value })} /></label>
           </div>
           <div><span className="rotulo">Tipo de contratação</span>
             <div className="flex flex-wrap gap-2">
@@ -77,43 +91,74 @@ export function EditorProposta({ proposta, marcaDefinida, sigla }: { proposta: P
         </section>
 
         <section className="cartao space-y-3">
-          <h2 className="titulo text-sm">2. Carta ao cliente (em 1ª pessoa)</h2>
-          <textarea className="campo min-h-40" value={d.carta} onChange={(e) => mudar({ carta: e.target.value })} aria-label="Carta ao cliente" />
-          <h2 className="titulo pt-2 text-sm">3. Por que investir em um bom projeto (sem citar preço)</h2>
-          <textarea className="campo min-h-40" value={d.porQueInvestir} onChange={(e) => mudar({ porQueInvestir: e.target.value })} aria-label="Por que investir em um bom projeto" />
+          <h2 className="titulo text-sm">2. Apresentação (carta em 1ª pessoa)</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block"><span className="rotulo">Título da apresentação</span><input className="campo" value={d.tituloApresentacao} onChange={(e) => mudarTexto({ tituloApresentacao: e.target.value })} /></label>
+            <label className="block"><span className="rotulo">Saudação</span><input className="campo" value={d.saudacao} placeholder={d.clienteNome ? `Olá, ${d.clienteNome}.` : "Ex.: Olá, equipe da Cris Bebidas."} onChange={(e) => mudar({ saudacao: e.target.value })} /></label>
+          </div>
+          <textarea className="campo min-h-48" value={d.carta} onChange={(e) => mudarTexto({ carta: e.target.value })} aria-label="Carta ao cliente" />
+          <label className="block"><span className="rotulo">Frase da capa</span><input className="campo" value={d.fraseCapa} onChange={(e) => mudarTexto({ fraseCapa: e.target.value })} /></label>
           {travessao && <p className="rounded-lg bg-adefinir p-2 text-xs text-adefinir-texto">Há travessão longo no texto. Ao gerar, ele é trocado por vírgula automaticamente (regra da marca).</p>}
         </section>
 
         <section className="cartao space-y-3">
-          <h2 className="titulo text-sm">4. Escopo: o que o cliente vai receber</h2>
-          <Lista itens={d.escopo} aoMudar={(escopo) => mudar({ escopo })} dica="Ex.: Projeto executivo de interiores de todos os ambientes" rotuloAdd="Adicionar item do escopo" />
+          <h2 className="titulo text-sm">3. Por que investir em um bom projeto (sem citar preço)</h2>
+          {d.diferenciais.map((x, i) => (
+            <div key={i} className="grid gap-2 rounded-xl border-l-4 border-dourado bg-bege/40 p-3 sm:grid-cols-[1fr_auto]">
+              <div className="space-y-2">
+                <input className="campo font-semibold" value={x.titulo} placeholder="Título" aria-label={`Diferencial ${i + 1}: título`} onChange={(e) => mudarTexto({ diferenciais: d.diferenciais.map((y, k) => (k === i ? { ...y, titulo: e.target.value } : y)) })} />
+                <input className="campo" value={x.texto} placeholder="Explicação em uma frase" aria-label={`Diferencial ${i + 1}: texto`} onChange={(e) => mudarTexto({ diferenciais: d.diferenciais.map((y, k) => (k === i ? { ...y, texto: e.target.value } : y)) })} />
+              </div>
+              <button type="button" className="botao-leve h-fit" onClick={() => mudarTexto({ diferenciais: d.diferenciais.filter((_, k) => k !== i) })} aria-label="Remover diferencial">✕</button>
+            </div>
+          ))}
+          <button type="button" className="botao-leve" disabled={d.diferenciais.length >= 5} onClick={() => mudarTexto({ diferenciais: [...d.diferenciais, { titulo: "", texto: "" }] })}>+ Adicionar diferencial</button>
         </section>
 
         <section className="cartao space-y-3">
-          <h2 className="titulo text-sm">5. Etapas (de 4 a 6) <span className={"etiqueta ml-2 normal-case " + (nEtapas >= 4 && nEtapas <= 6 ? "bg-verde/15 text-verde" : "bg-vermelho/10 text-vermelho")}>{nEtapas} etapa(s)</span></h2>
-          {d.etapas.map((e, i) => (
-            <div key={i} className="grid gap-2 rounded-xl bg-bege/40 p-3 sm:grid-cols-[2rem_1fr_9rem_auto]">
+          <h2 className="titulo text-sm">4. Escopo: o que está incluído no projeto</h2>
+          <p className="text-xs text-cinza">Cada item vira um card numerado: um título curto e uma frase explicando o benefício. Até 10 itens.</p>
+          {d.escopo.map((x, i) => (
+            <div key={i} className="grid gap-2 rounded-xl bg-bege/40 p-3 sm:grid-cols-[2rem_1fr_auto]">
               <span className="pt-2 text-lg font-bold text-dourado-escuro">{String(i + 1).padStart(2, "0")}</span>
               <div className="space-y-2">
-                <input className="campo font-semibold" value={e.titulo} placeholder="Título da etapa" aria-label={`Título da etapa ${i + 1}`} onChange={(ev) => mudar({ etapas: d.etapas.map((x, k) => (k === i ? { ...x, titulo: ev.target.value } : x)) })} />
-                <input className="campo" value={e.descricao} placeholder="O que acontece nesta etapa" aria-label={`Descrição da etapa ${i + 1}`} onChange={(ev) => mudar({ etapas: d.etapas.map((x, k) => (k === i ? { ...x, descricao: ev.target.value } : x)) })} />
+                <input className="campo font-semibold" value={x.titulo} placeholder="Ex.: Maquete 3D digital da fachada" aria-label={`Escopo ${i + 1}: título`} onChange={(e) => mudar({ escopo: d.escopo.map((y, k) => (k === i ? { ...y, titulo: e.target.value } : y)) })} />
+                <input className="campo" value={x.descricao} placeholder="Ex.: Permite enxergar a nova imagem antes mesmo de construir." aria-label={`Escopo ${i + 1}: descrição`} onChange={(e) => mudar({ escopo: d.escopo.map((y, k) => (k === i ? { ...y, descricao: e.target.value } : y)) })} />
               </div>
-              <input className={"campo h-fit" + vazio(e.prazo)} value={e.prazo} placeholder="Prazo: a definir" aria-label={`Prazo da etapa ${i + 1}`} onChange={(ev) => mudar({ etapas: d.etapas.map((x, k) => (k === i ? { ...x, prazo: ev.target.value } : x)) })} />
+              <button type="button" className="botao-leve h-fit" onClick={() => mudar({ escopo: d.escopo.filter((_, k) => k !== i) })} aria-label="Remover item do escopo">✕</button>
+            </div>
+          ))}
+          <button type="button" className="botao-leve" disabled={d.escopo.length >= 10} onClick={() => mudar({ escopo: [...d.escopo, { titulo: "", descricao: "" }] })}>+ Adicionar item do escopo</button>
+        </section>
+
+        <section className="cartao space-y-3">
+          <h2 className="titulo text-sm">5. Etapas do projeto (de 4 a 6) <span className={"etiqueta ml-2 normal-case " + (nEtapas >= 4 && nEtapas <= 6 ? "bg-verde/15 text-verde" : "bg-vermelho/10 text-vermelho")}>{nEtapas} etapa(s)</span></h2>
+          {d.etapas.map((e, i) => (
+            <div key={i} className="grid gap-2 rounded-xl bg-bege/40 p-3 sm:grid-cols-[2rem_1fr_auto]">
+              <span className="pt-2 text-lg font-bold text-dourado-escuro">{String(i + 1).padStart(2, "0")}</span>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input className="campo font-semibold" value={e.titulo} placeholder="Título da etapa" aria-label={`Título da etapa ${i + 1}`} onChange={(ev) => mudar({ etapas: d.etapas.map((x, k) => (k === i ? { ...x, titulo: ev.target.value } : x)) })} />
+                  <input className="campo w-40" value={e.prazo} placeholder="Prazo (opcional)" aria-label={`Prazo da etapa ${i + 1}`} onChange={(ev) => mudar({ etapas: d.etapas.map((x, k) => (k === i ? { ...x, prazo: ev.target.value } : x)) })} />
+                </div>
+                <textarea className={"campo" + vazio(e.itens.join(""))} rows={Math.max(2, e.itens.length)} value={e.itens.join("\n")} placeholder="O que acontece nesta etapa, um item por linha" aria-label={`Itens da etapa ${i + 1}`} onChange={(ev) => mudar({ etapas: d.etapas.map((x, k) => (k === i ? { ...x, itens: ev.target.value.split("\n") } : x)) })} />
+              </div>
               <button type="button" className="botao-leve h-fit" disabled={d.etapas.length <= 4} onClick={() => mudar({ etapas: d.etapas.filter((_, k) => k !== i) })} aria-label="Remover etapa">✕</button>
             </div>
           ))}
-          <button type="button" className="botao-leve" disabled={d.etapas.length >= 6} onClick={() => mudar({ etapas: [...d.etapas, { titulo: "", descricao: "", prazo: "" }] })}>+ Adicionar etapa</button>
+          <button type="button" className="botao-leve" disabled={d.etapas.length >= 6} onClick={() => mudar({ etapas: [...d.etapas, { titulo: "", itens: [], prazo: "" }] })}>+ Adicionar etapa</button>
         </section>
 
         <section className="cartao space-y-3">
           <h2 className="titulo text-sm">6. Investimento</h2>
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-5">
             <label className="block sm:col-span-2"><span className="rotulo">Valor total (R$)</span>
               <input className={"campo text-lg font-semibold" + vazio(d.valorTotal)} inputMode="decimal" placeholder="a definir" value={valorTxt} onChange={(e) => { setValorTxt(e.target.value); mudar({ valorTotal: paraNumero(e.target.value) }); }} />
               {valorTxt.trim() !== "" && d.valorTotal == null && <span className="text-xs text-vermelho">Digite só números, ex.: 12.500,00</span>}
             </label>
             <label className="block"><span className="rotulo">Desconto à vista (%)</span><input className="campo" inputMode="decimal" value={deNumero(d.descontoAVista)} onChange={(e) => mudar({ descontoAVista: Math.min(100, Math.max(0, paraNumero(e.target.value) ?? 0)) })} /></label>
             <label className="block"><span className="rotulo">Parcelas sem juros</span><input className="campo" inputMode="numeric" value={d.parcelasSemJuros} onChange={(e) => mudar({ parcelasSemJuros: Math.max(1, parseInt(e.target.value) || 1) })} /></label>
+            <label className="block"><span className="rotulo">Parcelas com juros</span><input className="campo" inputMode="numeric" value={d.parcelasComJuros} onChange={(e) => mudar({ parcelasComJuros: Math.max(1, parseInt(e.target.value) || 1) })} /></label>
           </div>
           <div className="rounded-xl bg-azul p-4 text-sm text-white">
             <p className="text-2xl font-bold">{d.valorTotal != null ? moeda(d.valorTotal) : <span className="adefinir">valor a definir</span>}</p>
@@ -145,8 +190,15 @@ export function EditorProposta({ proposta, marcaDefinida, sigla }: { proposta: P
 
         <section className="cartao space-y-3">
           <h2 className="titulo text-sm">7. Termos e condições</h2>
-          <p className="text-xs text-cinza">São textos de partida. Revise para que reflitam o seu contrato.</p>
+          <p className="text-xs text-cinza">O primeiro termo (validade em dias) é escrito sozinho a partir da validade informada. Revise os demais para que reflitam o seu contrato.</p>
           <Lista itens={d.termos} aoMudar={(termos) => mudar({ termos })} dica="Condição" rotuloAdd="Adicionar condição" />
+        </section>
+
+        <section className="cartao space-y-3">
+          <h2 className="titulo text-sm">8. Encerramento</h2>
+          <label className="block"><span className="rotulo">Minha missão</span><textarea className="campo" value={d.missao} onChange={(e) => mudarTexto({ missao: e.target.value })} /></label>
+          <span className="rotulo">Próximos passos</span>
+          <Lista itens={d.proximosPassos} aoMudar={(proximosPassos) => mudarTexto({ proximosPassos })} dica="Passo" rotuloAdd="Adicionar passo" />
         </section>
       </div>
 

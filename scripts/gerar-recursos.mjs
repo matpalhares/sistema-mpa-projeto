@@ -12,7 +12,7 @@ async function tingir(hex, saida, opacidade = 1) {
 await tingir("#0D2F63", dir + "mpa_logo_azul.png");
 await tingir("#C79B63", dir + "mpa_logo_dourado.png");
 await tingir("#0D2F63", dir + "mpa_marca_dagua.png", 0.05);
-const qr = (texto, saida) => QRCode.toFile(saida, texto, { errorCorrectionLevel: "H", margin: 2, width: 360, color: { dark: "#0D2F63", light: "#F7F4EE" } });
+const qr = (texto, saida, cor = "#0D2F63") => QRCode.toFile(saida, texto, { errorCorrectionLevel: "H", margin: 2, width: 360, color: { dark: cor, light: "#F7F4EE" } });
 await qr("https://wa.me/5517997080373", dir + "mpa_qr_whatsapp.png");
-await qr("https://instagram.com/matheuspalhares.arquitetura", dir + "mpa_qr_instagram.png");
+await qr("https://instagram.com/matheuspalhares.arquitetura", dir + "mpa_qr_instagram.png", "#A87B3F");
 console.log("ok");

@@ -1,6 +1,5 @@
-// Textos de partida da proposta. Tudo é editável na tela antes de gerar.
-// A carta vem da skill orcamento-mpa (sem travessão longo, por regra da marca).
-import type { DadosProposta, EtapaProposta } from "../tipos";
+// Textos de partida da proposta, no modelo aprovado (Proposta Cris Bebidas). Tudo é editável na tela.
+import type { DadosProposta, Diferencial, EtapaProposta, PerfilProposta } from "../tipos";
 import { hoje } from "../formato";
 
 export const TIPOS_CONTRATACAO = [
@@ -12,36 +11,73 @@ export const TIPOS_CONTRATACAO = [
   "Outro",
 ];
 
-export const CARTA_PADRAO =
-  "Acredito que projetos excepcionais não começam nas paredes: começam em uma conversa. É nessa conversa que eu entendo quem você é, como vive, o que valoriza e qual versão do seu espaço vai refletir tudo isso.\n\n" +
-  "Preparei esta proposta pensando no que conversamos. Nas próximas páginas explico o que vou entregar, como o trabalho acontece em cada etapa e o investimento previsto.\n\n" +
-  "Fico à disposição para ajustar o que for preciso.";
+interface TextosPerfil { fraseCapa: string; tituloApresentacao: string; carta: string; diferenciais: Diferencial[]; missao: string; proximosPassos: string[] }
 
-export const POR_QUE_INVESTIR_PADRAO =
-  "Um bom projeto é o que faz a obra acontecer sem sustos. Ele antecipa as decisões no papel, quando mudar ainda é simples, e entrega a cada profissional da obra a informação exata do que deve ser feito.\n\n" +
-  "Com o projeto completo em mãos, você compara orçamentos sobre a mesma base, evita retrabalho e desperdício de material e sabe o que esperar de cada fase.\n\n" +
-  "O resultado é um espaço pensado para a sua rotina, com conforto, funcionalidade e identidade, e não apenas uma planta bonita.";
+// COMERCIAL: textos do modelo Cris Bebidas (do próprio escritório).
+// RESIDENCIAL: mesma estrutura; carta e missão vêm da skill orcamento-mpa, em 1ª pessoa.
+// Os diferenciais 2 e 3 do residencial são uma adaptação sugerida: revise.
+export const TEXTOS: Record<"comercial" | "residencial", TextosPerfil> = {
+  comercial: {
+    fraseCapa: "Cada detalhe foi pensado especialmente para o seu negócio.",
+    tituloApresentacao: "Uma conversa que começa pelo seu negócio",
+    carta:
+      "É com grande satisfação que apresento esta proposta. Entendo que um espaço comercial bem pensado não é apenas um lugar de venda: é a base para o seu negócio crescer com organização, eficiência e uma imagem que valorize a sua marca.\n\n" +
+      "Neste trabalho, vou analisar com atenção as necessidades do seu negócio, organizar o fluxo de trabalho e de atendimento e transformar tudo isso em um projeto claro, visual e pronto para ser executado.\n\n" +
+      "Conte comigo em cada etapa. Meu compromisso é entregar um projeto funcional, bonito e que faça sentido para a sua realidade.",
+    diferenciais: [
+      { titulo: "Evita desperdício", texto: "Decisões tomadas no papel custam muito menos do que correções feitas durante a obra." },
+      { titulo: "Organiza o fluxo", texto: "Um layout bem pensado reduz deslocamentos, facilita a reposição e melhora o atendimento ao cliente." },
+      { titulo: "Valoriza a sua marca", texto: "Fachada e interiores atraentes ajudam a conquistar, encantar e fidelizar clientes." },
+      { titulo: "Dá segurança na execução", texto: "Com o projeto executivo detalhado, a equipe de obra trabalha com precisão e sem improvisos." },
+    ],
+    missao: "Meu compromisso vai muito além de entregar um projeto. Quero entregar um espaço que faça o seu negócio crescer com organização e uma imagem à altura do seu trabalho.",
+    proximosPassos: ["Revise esta proposta com atenção", "Assine e retorne uma via", "Realizo o levantamento inicial", "Seu projeto começa"],
+  },
+  residencial: {
+    fraseCapa: "Cada detalhe foi pensado especialmente para você.",
+    tituloApresentacao: "Uma conversa que começa por você",
+    carta:
+      "Acredito que projetos excepcionais não começam nas paredes: começam em uma conversa. É nessa conversa que eu entendo quem você é, como vive, o que valoriza e qual versão do seu espaço vai refletir tudo isso.\n\n" +
+      "Preparei esta proposta pensando no que conversamos. Nas próximas páginas explico o que vou entregar, como o trabalho acontece em cada etapa e o investimento previsto.\n\n" +
+      "Conte comigo em cada etapa. Meu compromisso é entregar um projeto funcional, bonito e que faça sentido para a sua realidade.",
+    diferenciais: [
+      { titulo: "Evita desperdício", texto: "Decisões tomadas no papel custam muito menos do que correções feitas durante a obra." },
+      { titulo: "Organiza a rotina", texto: "Um layout bem pensado reduz deslocamentos e deixa cada ambiente do jeito que a sua rotina pede." },
+      { titulo: "Valoriza o seu imóvel", texto: "Ambientes bem resolvidos e com identidade valorizam o imóvel e o dia a dia de quem vive nele." },
+      { titulo: "Dá segurança na execução", texto: "Com o projeto executivo detalhado, a equipe de obra trabalha com precisão e sem improvisos." },
+    ],
+    missao: "Meu compromisso vai muito além de entregar um projeto. Quero entregar o verdadeiro lar que você e sua família merecem.",
+    proximosPassos: ["Revise esta proposta com atenção", "Assine e retorne uma via", "Realizo o briefing inicial", "Seu projeto exclusivo começa"],
+  },
+};
+
+export const FRASE_CAPA_DESTAQUE = "Com precisão. Com beleza. Com você.";
 
 export const ETAPAS_PADRAO: EtapaProposta[] = [
-  { titulo: "Briefing", descricao: "Conversa inicial para entender a rotina, as necessidades e as referências.", prazo: "" },
-  { titulo: "Estudo preliminar", descricao: "Primeira proposta de layout e conceito, apresentada em reunião para os ajustes.", prazo: "" },
-  { titulo: "Maquete 3D e imagens", descricao: "Modelo tridimensional e imagens realistas para visualizar o resultado antes da obra.", prazo: "" },
-  { titulo: "Projeto executivo", descricao: "Desenhos técnicos completos para orçar e executar.", prazo: "" },
-  { titulo: "Detalhamentos e entrega", descricao: "Detalhamentos, especificações e entrega final do material.", prazo: "" },
+  { titulo: "Levantamento e análise", itens: ["Análise do programa de necessidades"], prazo: "" },
+  { titulo: "Estudo e layout", itens: ["Desenvolvimento do layout"], prazo: "" },
+  { titulo: "Maquetes e imagens", itens: ["Maquete 3D digital", "Imagens fotorrealistas"], prazo: "" },
+  { titulo: "Projeto executivo", itens: ["Desenhos técnicos e detalhamentos para execução das obras", "Entrega final do projeto"], prazo: "" },
 ];
 
-// Termos de partida: são condições comerciais do escritório, não normas. Revise antes de enviar.
+// Termos do modelo aprovado. A validade (1º item) é escrita automaticamente a partir dos dias informados.
 export const TERMOS_PADRAO = [
-  "Esta proposta é válida até a data indicada na capa.",
-  "O início dos trabalhos acontece após a assinatura desta proposta e a confirmação do pagamento conforme a forma escolhida.",
-  "Alterações de escopo solicitadas depois da aprovação de cada etapa podem gerar aditivo de prazo e de valor.",
-  "Não estão inclusos: taxas de órgãos públicos, cartório, projetos complementares e itens não descritos no escopo.",
+  "As condições de pagamento são as descritas na seção Investimento.",
+  "O escopo contempla somente os itens descritos nesta proposta. Qualquer item adicional será tratado em novo orçamento.",
+  "A execução da obra não está inclusa nesta proposta.",
+  "Os trabalhos têm início após o aceite desta proposta.",
 ];
+
+export function textosDoPerfil(perfil: PerfilProposta): Pick<DadosProposta, "fraseCapa" | "tituloApresentacao" | "carta" | "diferenciais" | "missao" | "proximosPassos"> {
+  const t = TEXTOS[perfil === "comercial" ? "comercial" : "residencial"];
+  return { ...t, diferenciais: t.diferenciais.map((d) => ({ ...d })), proximosPassos: [...t.proximosPassos] };
+}
 
 export function propostaInicial(base: Partial<DadosProposta> = {}): DadosProposta {
   return {
-    clienteNome: "", objetivo: "", tipoContratacao: "", obra: "", local: "", data: hoje(), validadeDias: null,
-    carta: CARTA_PADRAO, porQueInvestir: POR_QUE_INVESTIR_PADRAO, escopo: [], etapas: ETAPAS_PADRAO.map((e) => ({ ...e })),
+    perfil: "", clienteNome: "", objetivo: "", tipoContratacao: "", obra: "", local: "", data: hoje(), validadeDias: null,
+    saudacao: "", ...textosDoPerfil(""),
+    escopo: [], etapas: ETAPAS_PADRAO.map((e) => ({ ...e, itens: [...e.itens] })),
     valorTotal: null, descontoAVista: 5, parcelasSemJuros: 6, parcelasComJuros: 12,
     observacoes: "", itensExtras: [], termos: [...TERMOS_PADRAO], ...base,
   };

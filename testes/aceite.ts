@@ -33,7 +33,7 @@ async function imagensPorPagina(pdf: Buffer): Promise<{ imagens: number[]; texto
   const [mpa, lm] = EMPRESAS_INICIAIS;
 
   console.log("T07  Proposta MPA");
-  const dados = propostaInicial({ clienteNome: "Cliente de Teste", objetivo: "Projeto de interiores", tipoContratacao: "Projeto de interiores", escopo: ["Item A", "Item B — com travessão"], valorTotal: 18500, validadeDias: 15 });
+  const dados = propostaInicial({ perfil: "residencial", clienteNome: "Cliente de Teste", objetivo: "Projeto de interiores", tipoContratacao: "Projeto de interiores", escopo: [{ titulo: "Item A", descricao: "Descrição A" }, { titulo: "Item B — com travessão", descricao: "" }], valorTotal: 18500, validadeDias: 15 });
   dados.carta += "\n\nTexto com travessão — que deve sumir.";
   const pr = await salvar("propostas", { empresaId: "mpa", projetoId: null, versao: 1, status: "rascunho", dados, docx: null, pdf: null, verificacao: null } as never);
   const r = await gerarProposta(mpa, pr.id);
@@ -46,12 +46,14 @@ async function imagensPorPagina(pdf: Buffer): Promise<{ imagens: number[]; texto
     conferir("sem travessão longo", !v.temTravessao && !/[—–]/.test(texto.join(" ")));
     conferir("logo na capa", imagens[0] >= 1, `${imagens[0]} imagem na página 1`);
     conferir("capa sem foto (só o logo)", imagens[0] === 1);
+    conferir("6 páginas, como o modelo aprovado", v.paginas === 6, `${v.paginas} páginas`);
+    conferir("seções do modelo presentes", ["PROPOSTA EXCLUSIVA", "Por que investir em um bom projeto", "O que está incluído no projeto", "Etapas do projeto", "Valor do projeto", "Aceite da proposta", "Minha Missão", "Próximos Passos"].every((x) => texto.join("").replace(/\s/g, "").includes(x.replace(/\s/g, ""))));
     conferir("QR codes no encerramento", imagens[imagens.length - 1] >= 3, `${imagens[imagens.length - 1]} imagens na última página`);
-    conferir("pagamento padrão no texto", /5% de desconto/.test(texto.join(" ")) && /6x/.test(texto.join(" ")) && /12x com juros da operadora/.test(texto.join(" ")));
+    conferir("pagamento padrão no texto", /5% de desconto/.test(texto.join(" ")) && /6x de R\$ 3\.083,33/.test(texto.join(" ")) && /Até 12x/.test(texto.join(" ")) && /com juros da operadora/.test(texto.join(" ")));
     conferir("à vista calculado (18.500 − 5% = 17.575,00)", /17\.575,00/.test(texto.join(" ")));
   }
   conferir("bloqueia fora de 4 a 6 etapas", errosProposta({ ...dados, etapas: dados.etapas.slice(0, 3) }).length > 0);
-  conferir("bloqueia preço em 'Por que investir'", errosProposta({ ...dados, porQueInvestir: "Custa R$ 100" }).length > 0);
+  conferir("bloqueia preço em 'Por que investir'", errosProposta({ ...dados, diferenciais: [{ titulo: "Barato", texto: "Custa R$ 100" }] }).length > 0);
   const prLm = await salvar("propostas", { empresaId: "lm", projetoId: null, versao: 1, status: "rascunho", dados, docx: null, pdf: null, verificacao: null } as never);
   conferir("empresa com marca a definir não gera documento", !(await gerarProposta(lm, prLm.id)).ok);
   conferir("isolamento: MPA não acessa proposta da LM", !(await gerarProposta(mpa, prLm.id)).ok);

@@ -22,7 +22,11 @@ export const MARCA_MPA: Marca = {
   marcaDagua: "recursos/marca/mpa_marca_dagua.png",
   qrWhatsapp: "recursos/marca/mpa_qr_whatsapp.png",
   qrInstagram: "recursos/marca/mpa_qr_instagram.png",
-  fraseEncerramento: "Nosso compromisso vai muito além de entregar um projeto. Buscamos entregar o verdadeiro lar que você e sua família merecem.",
+  cabecalhoNome: "MATHEUS PALHARES",
+  cabecalhoSub: "ARQUITETURA + INTERIORES",
+  assinaturaNome: "Matheus Palhares",
+  assinaturaTitulo: "Arquiteto e Urbanista",
+  logoBranco: "recursos/marca/mpa_logo_branco.png",
 };
 
 // LM, Matelli e MPX têm identidade própria que ainda não foi enviada: ficam "a definir".

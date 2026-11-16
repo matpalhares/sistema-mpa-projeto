@@ -37,11 +37,11 @@ conferir("etapa atual muda ao clicar", (await pg.locator("button[name=etapa][val
 console.log("Proposta");
 await pg.click("button:has-text('Gerar proposta')"); await pg.waitForURL(/propostas\//);
 conferir("cliente veio do projeto", (await pg.locator("label:has-text('Nome do cliente') input").inputValue()) === "Cliente de Teste");
-await pg.click("button:has-text('Projeto de interiores')"); await pg.click("button:has-text('15 dias')");
-await pg.click("text=+ Adicionar item do escopo"); await pg.fill("input[aria-label='Item 1']", "Projeto executivo de interiores");
+await pg.click("button:has-text('Residência ou família')"); await pg.click("button:has-text('Projeto de interiores')"); await pg.click("button:has-text('15 dias')");
+await pg.click("text=+ Adicionar item do escopo"); await pg.fill("input[aria-label='Escopo 1: título']", "Projeto executivo de interiores");
 await pg.fill("input[placeholder='a definir'][inputmode=decimal]", "12.000,00");
 conferir("mostra cálculo à vista (R$ 11.400,00)", await pg.locator("text=11.400,00").first().isVisible());
-await pg.fill("input[aria-label='Item 1']", "Projeto executivo de interiores completo");
+await pg.fill("input[aria-label='Item 1']", "As condições de pagamento estão na seção Investimento.");
 conferir("campo de lista mantém o foco ao digitar", await pg.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Item 1"));
 await foto("3-proposta");
 await pg.click("button:has-text('Gerar proposta (DOCX + PDF)')"); await pg.waitForSelector("text=Proposta gerada", { timeout: 120000 });
