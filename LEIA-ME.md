@@ -10,7 +10,8 @@ Projetos, propostas, memoriais e detalhamentos do escritório. Fase 1 concluída
   as abas Orçamento de obra e Cronograma só aparecem se o cliente contratou a execução.
 - Proposta comercial em DOCX e PDF no modelo visual aprovado (Proposta Cris Bebidas), com revisão automática de paginação.
 - Memorial descritivo completo e simplificado (prefeitura), em DOCX e PDF.
-- Marmoraria (Fase 2): prancha A4 da bancada com vista superior cotada, vista frontal, corte, perspectiva, fixação e lista de peças. O sistema só gera depois de responder pedra, cuba, torneira e medidas, e confere sozinho se algum texto ou cota ficou sobreposto.
+- Áreas molhadas a partir da planta (Fase 2): o sistema lê os banheiros da planta (precisa da chave do Claude), você confere o desenho de cada ambiente e responde as perguntas obrigatórias (pedra, cuba, torneira, vaso, barras de acessibilidade, espelho, box, revestimentos). Saem o executivo A3 de cada ambiente (planta cotada, vistas, detalhe da bancada, quadro de pontos, notas, carimbo e perspectiva) e a marmoraria de cada bancada. As barras de apoio são locadas pela ABNT NBR 9050:2020, itens 7.6 e 7.7.2.2.
+- Marmoraria avulsa (Fase 2): prancha A4 da bancada com vista superior cotada, vista frontal, corte, perspectiva, fixação e lista de peças. O sistema só gera depois de responder pedra, cuba, torneira e medidas, e confere sozinho se algum texto ou cota ficou sobreposto.
 
 ## Como abrir no seu computador
 
@@ -58,5 +59,5 @@ Os dados da pasta `dados` não migram sozinhos para o Supabase.
 
 ## Próximas entregas
 
-- **Fase 2 (em andamento):** executivo de áreas molhadas (padrão B, A3) e marcenaria com o plugin do SketchUp.
+- **Fase 2 (em andamento):** marcenaria com o plugin do SketchUp; cozinhas e copas com equipamentos e banheiros com cabines no executivo; barras do lavatório acessível.
 - **Fase 3:** gestão da obra (cronograma, relatório fotográfico, comparativo, financeiro e recibos).

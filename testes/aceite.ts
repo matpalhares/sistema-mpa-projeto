@@ -113,6 +113,38 @@ async function imagensPorPagina(pdf: Buffer): Promise<{ imagens: number[]; texto
   conferir("bloqueia cuba que não cabe na bancada", !(await gerarMarmoraria(mpa, (await novoDet({ ...CASOS.bwc, cubaLargura: 1.3 })).id)).ok);
   conferir("bloqueia sem a conferência das medidas", !(await gerarMarmoraria(mpa, (await novoDet({ ...CASOS.bwc, medidasConfirmadas: false })).id)).ok);
 
+  console.log("Áreas molhadas a partir da planta (executivo A3 + marmoraria)");
+  const { gerarConjuntoMolhadas } = await import("../src/lib/servicos");
+  const { EXEMPLOS, NBR9050_PADRAO, barrasDoAmbiente, nbr, respostasIniciais, bancadaDoAmbiente } = await import("../src/lib/pranchas/ambiente");
+  const { RESP } = await import("./exemplo-executivo");
+  const novoCj = (ambientes: unknown[], respostas: unknown) => salvar("molhadas", { empresaId: "mpa", projetoId: "x", planta: null, ambientes, respostas, parametros: NBR9050_PADRAO, saidas: [], avisos: [] } as never);
+  const semResp = await gerarConjuntoMolhadas(mpa, (await novoCj([{ ...EXEMPLOS.bwc2pne, acessivel: "" }], respostasIniciais({ modeloConferido: true }))).id);
+  const pq = semResp.ok ? "" : semResp.erros.join(" | ");
+  conferir("T09: sem respostas, não gera e pergunta pedra, cuba, torneira, vaso e acessibilidade", !semResp.ok && ["Qual pedra", "tipo de cuba", "tipo de torneira", "tipo de vaso", "barras de acessibilidade"].every((x) => pq.includes(x)), pq.slice(0, 80));
+  conferir("sem conferir o desenho lido, não gera", !(await gerarConjuntoMolhadas(mpa, (await novoCj([EXEMPLOS.bwc1], RESP({ modeloConferido: false }))).id)).ok);
+  const cjr = await gerarConjuntoMolhadas(mpa, (await novoCj(Object.values(EXEMPLOS), RESP())).id);
+  conferir("gera o conjunto dos 4 ambientes de teste", cjr.ok);
+  if (cjr.ok) {
+    const sd = cjr.dados!.saidas;
+    conferir("um executivo por ambiente e uma marmoraria por bancada", sd.filter((x) => x.tipo === "executivo").length === 4 && sd.filter((x) => x.tipo === "marmoraria").length === 4);
+    conferir("nenhuma prancha com texto ou cota sobreposto", sd.every((x) => x.sobreposicoes === 0), sd.filter((x) => x.sobreposicoes).map((x) => x.nome).join("; "));
+    const tx = (await imagensPorPagina((await lerArquivo(sd.find((x) => x.nome.startsWith("BWC 2"))!.pdf))!)).texto.join(" ");
+    conferir("folhas numeradas no conjunto (03/08 e 04/08)", tx.includes("03/08") && tx.includes("04/08"));
+    conferir("executivo tem planta, vistas, detalhe, quadro, notas e carimbo", ["PLANTA BAIXA - BWC 2 (PNE)", "VISTA A - PAREDE", "DETALHE DA BANCADA", "QUADRO DE PONTOS E ALTURAS", "NOTAS", "EXECUTIVO - ÁREAS MOLHADAS", "SEM ESCALA", "PERSPECTIVA ISOMÉTRICA"].every((x) => tx.includes(x)));
+    conferir("pontos padrão: lavatório AF 0,60 / ES 0,50 e vaso AF 0,25", tx.includes("AF 0,60") && tx.includes("ES 0,50") && tx.includes("AF 0,25"));
+    conferir("barras citam a NBR 9050:2020, item 7.7.2.2", tx.includes("NBR 9050:2020") && tx.includes("7.7.2.2"));
+  }
+  const bb = barrasDoAmbiente(EXEMPLOS.bwc2pne, nbr(), true).barras, perto = (x: number, y: number) => Math.abs(x - y) < 0.006;
+  const bf = bb.find((x) => x.tipo === "fundo")!, bl = bb.find((x) => x.tipo === "lateral")!, bv = bb.find((x) => x.tipo === "vertical")!;
+  conferir("NBR 9050 fundo: 0,80 m, passa 0,30 m do eixo para a parede lateral, a 0,89 m com caixa acoplada", bf.parede === "S" && perto(bf.de, 0.48) && perto(bf.ate, 1.28) && perto(bf.z1, 0.89));
+  conferir("NBR 9050 fundo sem caixa acoplada: 0,75 m", perto(barrasDoAmbiente(EXEMPLOS.bwc2pne, nbr(), false).barras.find((x) => x.tipo === "fundo")!.z1, 0.75));
+  conferir("NBR 9050 lateral: 0,80 m a 0,75 m de altura, terminando 0,50 m além da borda frontal da bacia", bl.parede === "L" && perto(bl.ate - bl.de, 0.8) && perto(bl.z1, 0.75) && perto(1.98 - bl.de, 0.65 + 0.5));
+  conferir("NBR 9050 vertical: 0,70 m, 0,10 m acima da horizontal, a 0,30 m da borda frontal", bv.parede === "L" && perto(bv.z2 - bv.z1, 0.7) && perto(bv.z1, 0.85) && perto(1.98 - bv.de, 0.65 + 0.3));
+  conferir("avisa quando o vaso está longe demais da parede para a barra lateral", barrasDoAmbiente({ ...EXEMPLOS.bwc2pne, vasos: [{ parede: "S", eixo: 0.75 }] }, nbr(), true).avisos.some((x) => x.includes("7.7.2.2.1")));
+  conferir("avisa porta abrindo para dentro em sanitário acessível (7.5 f)", barrasDoAmbiente({ ...EXEMPLOS.bwc1 }, nbr(), true).avisos.some((x) => x.includes("alínea f")));
+  const bd = bancadaDoAmbiente(EXEMPLOS.bwc1, 0, RESP());
+  conferir("laterais da bancada saem da planta, sem perguntar (BWC 1: esquerda aberta, direita na parede)", bd.lateralEsquerda === "aberta" && bd.lateralDireita === "parede" && bd.comprimento === 0.95);
+
   console.log(falhas ? `\n${falhas} FALHA(S)` : "\nTodos os testes passaram.");
   process.exit(falhas ? 1 : 0);
 })();

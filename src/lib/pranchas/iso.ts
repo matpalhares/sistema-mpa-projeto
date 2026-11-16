@@ -8,6 +8,7 @@ export interface Solido {
   cor: V3; // 0 a 255
   pedra?: boolean; // textura procedural de pedra
   semArestas?: boolean;
+  alfa?: number; // 0 a 1: translúcido (vidro, espelho), desenhado depois dos opacos
 }
 export interface Render { png: Buffer; largura: number; altura: number; projetar: (p: V3) => [number, number] }
 
@@ -46,7 +47,7 @@ export async function renderizar(solidos: Solido[], larguraPx: number, alturaPx:
   const zb = new Float32Array(W * H).fill(-Infinity);
   const LUZ: [V3, number][] = [[[0, 0, 1], 1.0], [[1, 0, 0], 0.84], [[0, -1, 0], 0.7], [[-1, 0, 0], 0.62], [[0, 1, 0], 0.62], [[0, 0, -1], 0.5]];
 
-  const triangulo = (a: V3, b: V3, c: V3, s: Solido, luz: number, eixo: number) => {
+  const triangulo = (a: V3, b: V3, c: V3, s: Solido, luz: number, eixo: number, alfa = 1) => {
     const A = tela(a), B = tela(b), C = tela(c);
     const minX = Math.max(0, Math.floor(Math.min(A[0], B[0], C[0]))), maxX = Math.min(W - 1, Math.ceil(Math.max(A[0], B[0], C[0])));
     const minY = Math.max(0, Math.floor(Math.min(A[1], B[1], C[1]))), maxY = Math.min(H - 1, Math.ceil(Math.max(A[1], B[1], C[1])));
@@ -61,7 +62,7 @@ export async function renderizar(solidos: Solido[], larguraPx: number, alturaPx:
       const z = w0 * A[2] + w1 * B[2] + w2 * C[2];
       const i = y * W + x;
       if (z <= zb[i]) continue;
-      zb[i] = z;
+      if (alfa >= 1) zb[i] = z;
       let f = luz;
       if (s.pedra) {
         // textura por coordenadas do mundo (em metros): grãos finos + manchas maiores
@@ -70,7 +71,8 @@ export async function renderizar(solidos: Solido[], larguraPx: number, alturaPx:
         const fino = ruido(u * 420, v * 420, eixo), medio = ruido(u * 90, v * 90, eixo + 7);
         f *= 0.9 + 0.14 * medio + (fino > 0.93 ? 0.1 : fino < 0.07 ? -0.16 : 0);
       }
-      cor[i * 4] = s.cor[0] * f; cor[i * 4 + 1] = s.cor[1] * f; cor[i * 4 + 2] = s.cor[2] * f; cor[i * 4 + 3] = 255;
+      if (alfa >= 1) { cor[i * 4] = s.cor[0] * f; cor[i * 4 + 1] = s.cor[1] * f; cor[i * 4 + 2] = s.cor[2] * f; cor[i * 4 + 3] = 255; }
+      else { for (let k = 0; k < 3; k++) cor[i * 4 + k] = (cor[i * 4 + 3] ? cor[i * 4 + k] : 247) * (1 - alfa) + s.cor[k] * f * alfa; cor[i * 4 + 3] = 255; }
     }
   };
 
@@ -84,14 +86,15 @@ export async function renderizar(solidos: Solido[], larguraPx: number, alturaPx:
     ].filter((f) => dot(f.n, cam) > 1e-6).map((f) => ({ ...f, p: f.q.map(P) }));
   };
 
-  for (const s of solidos) for (const f of faces(s)) {
+  const opacos = solidos.filter((s) => s.alfa == null || s.alfa >= 1), vidros = solidos.filter((s) => s.alfa != null && s.alfa < 1);
+  for (const s of opacos) for (const f of faces(s)) {
     const luz = LUZ.find(([n]) => dot(n, f.n) > 0.99)![1];
     triangulo(f.p[0], f.p[1], f.p[2], s, luz, f.eixo);
     triangulo(f.p[0], f.p[2], f.p[3], s, luz, f.eixo);
   }
   // arestas com teste de profundidade
   const eps = 0.004;
-  for (const s of solidos) {
+  const arestas = (lista: Solido[]) => { for (const s of lista) {
     if (s.semArestas) continue;
     for (const f of faces(s)) for (let k = 0; k < 4; k++) {
       const A = tela(f.p[k]), B = tela(f.p[(k + 1) % 4]);
@@ -107,7 +110,15 @@ export async function renderizar(solidos: Solido[], larguraPx: number, alturaPx:
         }
       }
     }
+  } };
+  arestas(opacos);
+  // translúcidos: só a face mais próxima de cada sólido, misturada sobre o que já está desenhado
+  for (const s of vidros) for (const f of faces(s)) {
+    const luz = LUZ.find(([n]) => dot(n, f.n) > 0.99)![1];
+    triangulo(f.p[0], f.p[1], f.p[2], s, luz, f.eixo, s.alfa);
+    triangulo(f.p[0], f.p[2], f.p[3], s, luz, f.eixo, s.alfa);
   }
+  arestas(vidros);
   const png = await sharp(Buffer.from(cor.buffer), { raw: { width: W, height: H, channels: 4 } }).resize(larguraPx, alturaPx, { kernel: "lanczos3" }).png().toBuffer();
   return { png, largura: larguraPx, altura: alturaPx, projetar: (p) => { const [x, y] = tela(p); return [x / W, y / H]; } };
 }

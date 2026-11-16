@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { listar, obter, salvar } from "@/lib/banco";
 import { lerArquivo, removerArquivo, salvarArquivo, nomeSeguro } from "@/lib/arquivos";
 import { conferirSenha, contexto, criarSessao, definirEmpresa, encerrarSessao, hashSenha, semear } from "@/lib/sessao";
-import type { Detalhamento, Cliente, DadosMemorial, DadosProposta, Empresa, Marca, Memorial, Projeto, Proposta, StatusProposta, TipoMemorial, Usuario } from "@/lib/tipos";
+import type { ConjuntoMolhadas, Detalhamento, Cliente, DadosMemorial, DadosProposta, Empresa, Marca, Memorial, Projeto, Proposta, StatusProposta, TipoMemorial, Usuario } from "@/lib/tipos";
 import { propostaInicial } from "@/lib/documentos/textos-proposta";
 import { memorialInicial } from "@/lib/documentos/regras-memorial";
-import { gerarMarmoraria, gerarMemorial, gerarProposta, type Resultado } from "@/lib/servicos";
+import { gerarConjuntoMolhadas, gerarMarmoraria, gerarMemorial, gerarProposta, type Resultado } from "@/lib/servicos";
+import { NBR9050_PADRAO, respostasIniciais, type Ambiente, type ParametroNBR, type RespostasAmbiente } from "@/lib/pranchas/ambiente";
 import { bancadaInicial, type DadosBancada } from "@/lib/pranchas/regras-bancada";
-import { iaDisponivel, lerPlanta, type LeituraPlanta } from "@/lib/ia";
+import { iaDisponivel, lerAreasMolhadas, lerPlanta, type LeituraPlanta } from "@/lib/ia";
 import { faltaNaMarca } from "@/lib/marca";
 
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -273,6 +274,62 @@ export async function salvarEGerarDetalhamento(id: string, dados: DadosBancada, 
   const s = await salvarDetalhamento(id, dados, plantaSituacao);
   if (!s.ok) return s;
   const r = await gerarMarmoraria(empresa, id);
+  revalidatePath("/", "layout");
+  return r;
+}
+
+// ---------- ÁREAS MOLHADAS A PARTIR DA PLANTA ----------
+export async function novoConjuntoMolhadas(f: FormData) {
+  const { empresa } = await contexto();
+  const p = await obter<Projeto>("projetos", txt(f, "projetoId"), empresa.id);
+  if (!p) redirect("/");
+  const c = await obter<Cliente>("clientes", p.clienteId, empresa.id);
+  const planta = p.arquivos.find((a) => a.categoria === "planta");
+  const cj = await salvar<ConjuntoMolhadas>("molhadas", {
+    empresaId: empresa.id, projetoId: p.id, planta: planta?.caminho ?? null, ambientes: [], parametros: NBR9050_PADRAO.map((x) => ({ ...x })), saidas: [], avisos: [],
+    respostas: respostasIniciais({ cliente: c?.nome ?? "", local: [p.endereco, p.municipio].filter(Boolean).join(", "), origemPlanta: planta?.nome ?? "" }),
+  });
+  redirect(`/areas-molhadas/${cj.id}`);
+}
+
+export async function lerAmbientesDaPlanta(id: string, caminho: string): Promise<Resultado<{ ambientes: Ambiente[]; observacoes: string }>> {
+  const { empresa } = await contexto();
+  if (!iaDisponivel()) return { ok: false, erros: ["A leitura automática está desligada: a chave da API do Claude ainda não foi cadastrada (veja o LEIA-ME). Enquanto isso, adicione os ambientes à mão."] };
+  const cj = await obter<ConjuntoMolhadas>("molhadas", id, empresa.id);
+  const p = cj && (await obter<Projeto>("projetos", cj.projetoId, empresa.id));
+  const arq = p?.arquivos.find((a) => a.caminho === caminho);
+  if (!cj || !arq) return { ok: false, erros: ["Planta não encontrada no projeto."] };
+  const ext = arq.nome.toLowerCase().split(".").pop() ?? "";
+  const mime = ({ png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", pdf: "application/pdf" } as Record<string, string>)[ext];
+  if (!mime) return { ok: false, erros: ["A leitura automática aceita planta em PNG, JPG, WEBP ou PDF."] };
+  const buf = await lerArquivo(caminho);
+  if (!buf) return { ok: false, erros: ["Não consegui abrir o arquivo."] };
+  try {
+    const l = await lerAreasMolhadas(buf, mime);
+    const ambientes: Ambiente[] = l.ambientes.map((a) => ({
+      ...a, acessivel: "", porta: a.porta ? { ...a.porta, altura: 2.1 } : null,
+      chuveiro: a.chuveiro ? { ...a.chuveiro, registros: a.chuveiro.registros >= 2 ? 2 : 1 } : null,
+    }));
+    return { ok: true, dados: { ambientes, observacoes: `${l.observacoes} Escala lida: ${l.escala}.` } };
+  } catch (e) {
+    return { ok: false, erros: ["A leitura automática falhou: " + (e instanceof Error ? e.message : "erro desconhecido")] };
+  }
+}
+
+export async function salvarConjuntoMolhadas(id: string, dados: { planta: string | null; ambientes: Ambiente[]; respostas: RespostasAmbiente; parametros: ParametroNBR[] }): Promise<Resultado> {
+  const { empresa } = await contexto();
+  const cj = await obter<ConjuntoMolhadas>("molhadas", id, empresa.id);
+  if (!cj) return { ok: false, erros: ["Conjunto não encontrado."] };
+  await salvar<ConjuntoMolhadas>("molhadas", { ...cj, ...dados });
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function salvarEGerarConjuntoMolhadas(id: string, dados: { planta: string | null; ambientes: Ambiente[]; respostas: RespostasAmbiente; parametros: ParametroNBR[] }): Promise<Resultado<ConjuntoMolhadas>> {
+  const { empresa } = await contexto();
+  const s = await salvarConjuntoMolhadas(id, dados);
+  if (!s.ok) return s;
+  const r = await gerarConjuntoMolhadas(empresa, id);
   revalidatePath("/", "layout");
   return r;
 }

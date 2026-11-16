@@ -86,6 +86,27 @@ conferir("prancha gerada sem sobreposições", await pg.locator("text=Nenhum tex
 const rp = await pg.request.get(base + (await pg.locator("a:has-text('Abrir PDF')").getAttribute("href")));
 conferir("PDF da prancha abre pelo link", rp.status() === 200 && (await rp.body()).subarray(0, 4).toString() === "%PDF");
 
+console.log("Áreas molhadas pela planta");
+await pg.goto(urlProjeto + "?aba=detalhamentos"); await pg.click("button:has-text('Detalhar pela planta')"); await pg.waitForURL(/areas-molhadas\//);
+conferir("sem chave do Claude, avisa e oferece adicionar à mão", await pg.locator("text=A leitura automática depende da chave").isVisible());
+await pg.click("text=+ Adicionar ambiente à mão");
+await pg.locator("summary:has-text('Corrigir a leitura')").click();
+await pg.click("button:has-text('+ Vaso')"); await pg.click("button:has-text('+ Bancada')"); await pg.click("button:has-text('+ Porta')");
+conferir("mostra a prévia do ambiente para conferir", await pg.locator("svg[aria-label^='Desenho lido']").isVisible());
+conferir("pergunta vaso, cuba, torneira e acessibilidade antes de gerar", await pg.locator("li:has-text('Qual o tipo de vaso sanitário?')").isVisible() && await pg.locator("li:has-text('barras de acessibilidade')").isVisible() && await pg.locator("button:has-text('Gerar todas as pranchas')").isDisabled());
+await pg.click("button:has-text('Sim, locar pela NBR 9050')");
+conferir("mostra os parâmetros da NBR 9050 com o item da norma", await pg.locator("text=Item 7.7.2.2.1").first().isVisible());
+await pg.click("button:has-text('Granito Itaúnas')"); await pg.click("button:has-text('Embutir')");
+await pg.fill("input[aria-label='Cuba: largura']", "0,30"); await pg.fill("input[aria-label='Cuba: profundidade']", "0,30");
+await pg.click("button:has-text('Mesa, bica alta')"); await pg.click("button:has-text('Caixa acoplada')"); await pg.click("button:has-text('Sim (de 1,15 a 2,10 m)')"); await pg.click("button:has-text('Ainda não')");
+conferir("sem conferir o desenho, continua bloqueado", await pg.locator("button:has-text('Gerar todas as pranchas')").isDisabled());
+await pg.check("aside input[type=checkbox]");
+await foto("11-areas-molhadas");
+await pg.click("button:has-text('Gerar todas as pranchas')"); await pg.waitForSelector("text=prancha(s) gerada(s)", { timeout: 180000 });
+conferir("gera o executivo e a marmoraria do ambiente", (await pg.locator("aside a:has-text('executivo')").count()) === 1 && (await pg.locator("aside a:has-text('marmoraria')").count()) === 1);
+conferir("mostra os avisos da NBR 9050 para conferir", await pg.locator("text=Avisos para conferir").isVisible());
+await foto("12-areas-molhadas-geradas");
+
 console.log("Empresas e isolamento");
 await pg.goto(base); await foto("7-painel");
 conferir("Painel mostra o projeto e pendências", await pg.locator("text=Residência de Teste").first().isVisible() && await pg.locator("h2:has-text('Falta preencher')").isVisible());

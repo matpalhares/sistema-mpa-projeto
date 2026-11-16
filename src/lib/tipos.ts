@@ -238,4 +238,20 @@ export interface Detalhamento {
   atualizadoEm: string;
 }
 
+// Conjunto de áreas molhadas de um projeto: ambientes lidos da planta + respostas + pranchas geradas.
+export interface SaidaPrancha { nome: string; tipo: "executivo" | "marmoraria"; pdf: string; folhas: number; sobreposicoes: number }
+export interface ConjuntoMolhadas {
+  id: Id;
+  empresaId: Id;
+  projetoId: Id;
+  planta: string | null;
+  ambientes: import("./pranchas/ambiente").Ambiente[];
+  respostas: import("./pranchas/ambiente").RespostasAmbiente;
+  parametros: import("./pranchas/ambiente").ParametroNBR[];
+  saidas: SaidaPrancha[];
+  avisos: string[];
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
 export const A_DEFINIR = "a definir";

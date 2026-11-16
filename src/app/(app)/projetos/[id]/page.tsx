@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { arquivarProjeto, atualizarProjeto, definirEtapa, excluirArquivo, novaProposta, novoDetalhamento, novoMemorial, statusProposta } from "../../../acoes";
+import { arquivarProjeto, atualizarProjeto, definirEtapa, excluirArquivo, novaProposta, novoConjuntoMolhadas, novoDetalhamento, novoMemorial, statusProposta } from "../../../acoes";
 import { BarraEtapas } from "@/componentes/BarraEtapas";
 import { CamposProjeto } from "@/componentes/CamposProjeto";
 import { EnvioArquivo } from "@/componentes/EnvioArquivo";
@@ -10,7 +10,7 @@ import { listar, obter } from "@/lib/banco";
 import { dataBR, moeda } from "@/lib/formato";
 import { pendenciasProjeto } from "@/lib/pendencias";
 import { contexto } from "@/lib/sessao";
-import type { Cliente, Detalhamento, Memorial, Projeto, Proposta } from "@/lib/tipos";
+import type { Cliente, ConjuntoMolhadas, Detalhamento, Memorial, Projeto, Proposta } from "@/lib/tipos";
 
 const CATEGORIA = { planta: "Planta baixa", sketchup: "SketchUp", contrato: "Contrato", outro: "Outro" };
 const COR_STATUS: Record<string, string> = { rascunho: "bg-bege text-cinza", enviada: "bg-[#DDEBF7] text-azul", aprovada: "bg-verde/15 text-verde", recusada: "bg-vermelho/10 text-vermelho" };
@@ -21,16 +21,17 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
   const { aba = "visao" } = await searchParams;
   const p = await obter<Projeto>("projetos", id, empresa.id);
   if (!p) notFound();
-  const [c, propostas, memoriais, detalhamentos] = await Promise.all([
+  const [c, propostas, memoriais, detalhamentos, conjuntos] = await Promise.all([
     obter<Cliente>("clientes", p.clienteId, empresa.id),
     listar<Proposta>("propostas", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
     listar<Memorial>("memoriais", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
     listar<Detalhamento>("detalhamentos", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
+    listar<ConjuntoMolhadas>("molhadas", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
   ]);
   const pend = pendenciasProjeto(p, c);
   // Regra T10: Orçamento de obra e Cronograma só existem se o cliente contratou a execução.
   const abas = [
-    ["visao", "Visão geral"], ["dados", "Dados"], ["propostas", `Propostas (${propostas.length})`], ["memorial", `Memorial (${memoriais.length})`], ["detalhamentos", `Detalhamentos (${detalhamentos.length})`], ["arquivos", `Arquivos (${p.arquivos.length})`],
+    ["visao", "Visão geral"], ["dados", "Dados"], ["propostas", `Propostas (${propostas.length})`], ["memorial", `Memorial (${memoriais.length})`], ["detalhamentos", `Detalhamentos (${detalhamentos.length + conjuntos.length})`], ["arquivos", `Arquivos (${p.arquivos.length})`],
     ...(p.contratouExecucao === true ? [["orcamento", "Orçamento de obra"], ["cronograma", "Cronograma"]] : []),
   ];
   return (
@@ -69,7 +70,6 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
             </section>
             <section className="cartao space-y-3 text-sm">
               <h2 className="titulo text-sm">O que vem nas próximas fases</h2>
-              <p className="flex items-center justify-between">Executivo de áreas molhadas (padrão B) <EmBreve fase={2} /></p>
               <p className="flex items-center justify-between">Marcenaria a partir do SketchUp <EmBreve fase={2} /></p>
               <p className="flex items-center justify-between">Cronograma, relatório, comparativo, financeiro e recibos <EmBreve fase={3} /></p>
               {p.contratouExecucao !== true && <p className="rounded-lg bg-bege/60 p-2 text-xs text-cinza">As abas Orçamento de obra e Cronograma estão ocultas porque {p.contratouExecucao === false ? "o cliente não contratou a execução" : "ainda não foi informado se o cliente contratou a execução"}.</p>}
@@ -132,12 +132,22 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
           <div className="grid gap-3 sm:grid-cols-3">
             <form action={novoDetalhamento} className="cartao"><input type="hidden" name="projetoId" value={p.id} />
               <p className="font-semibold text-azul">Marmoraria: bancada</p>
-              <p className="mb-3 text-xs text-cinza">Prancha A4 para a marmoraria: vista superior cotada, vista frontal, corte, perspectiva, fixação e lista de peças.</p>
+              <p className="mb-3 text-xs text-cinza">Uma bancada avulsa (cozinha, copa), com as medidas informadas por você.</p>
               <button className="botao w-full">Detalhar bancada</button>
             </form>
-            <div className="cartao bg-bege/40"><p className="flex items-center justify-between font-semibold text-azul">Executivo de áreas molhadas <EmBreve fase={2} /></p><p className="text-xs text-cinza">Prancha A3 com planta, vistas internas, quadro de pontos e perspectiva do ambiente. Em construção.</p></div>
+            <form action={novoConjuntoMolhadas} className="cartao border-azul"><input type="hidden" name="projetoId" value={p.id} />
+              <p className="font-semibold text-azul">Áreas molhadas a partir da planta</p>
+              <p className="mb-3 text-xs text-cinza">O sistema lê os banheiros da planta, você confere o desenho e responde as perguntas. Saem o executivo A3 de cada ambiente e a marmoraria de cada bancada.</p>
+              <button className="botao-ouro w-full">Detalhar pela planta</button>
+            </form>
             <div className="cartao bg-bege/40"><p className="flex items-center justify-between font-semibold text-azul">Marcenaria <EmBreve fase={2} /></p><p className="text-xs text-cinza">A partir do SketchUp, com o plugin exportador. Em construção.</p></div>
           </div>
+          {conjuntos.map((cj) => (
+            <div key={cj.id} className="cartao flex flex-wrap items-center gap-3">
+              <div className="grow"><p className="font-semibold text-azul">Áreas molhadas · {cj.ambientes.map((a) => a.nome).join(", ") || "sem ambientes ainda"}</p><p className="text-xs text-cinza">{cj.saidas.length} prancha(s) gerada(s) · atualizado em {dataBR(cj.atualizadoEm)}</p></div>
+              <Link href={`/areas-molhadas/${cj.id}`} className="botao">Abrir</Link>
+            </div>
+          ))}
           {detalhamentos.map((dt) => (
             <div key={dt.id} className="cartao flex flex-wrap items-center gap-3">
               <div className="grow"><p className="font-semibold text-azul">Marmoraria · {dt.dados.nomePrancha || dt.dados.ambiente || "bancada sem nome"}</p><p className="text-xs text-cinza">{dt.dados.pedra || "pedra a responder"} · atualizado em {dataBR(dt.atualizadoEm)}</p></div>

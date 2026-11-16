@@ -136,7 +136,7 @@ export class Prancha {
     else { this.linha(x2, yCota, x2 + 2, yCota, { cor, esp: 0.15 }); this.texto(rotulo, x2 + 2.6, yCota - alt / 2, { tam, fonte: "medio", cor, dono }); }
   }
   // Cota vertical: mede de y1 a y2; a linha de cota fica em xCota; o número fica ao lado, na horizontal.
-  cotaV(y1: number, y2: number, xRef: number, xCota: number, rotulo: string, o: { tam?: number; cor?: string; lado?: "dir" | "esq" } = {}) {
+  cotaV(y1: number, y2: number, xRef: number, xCota: number, rotulo: string, o: { tam?: number; cor?: string; lado?: "dir" | "esq"; vertical?: boolean } = {}) {
     const cor = o.cor ?? COR.vermelho, tam = o.tam ?? 6.5, dono = this.proximoDono++;
     const s = xCota < xRef ? -1 : 1;
     this.linha(xRef + s * 1, y1, xCota + s * 1.2, y1, { cor, esp: 0.12 });
@@ -147,6 +147,14 @@ export class Prancha {
     this.segmentos.push({ x1: xCota, y1, x2: xCota, y2, folha: this.folha, dono });
     const alt = (tam * 1.15) / MM;
     const lado = o.lado ?? (s > 0 ? "dir" : "esq");
+    if (o.vertical) {
+      // texto girado 90°, lido de baixo para cima, do lado de dentro da linha de cota
+      this.doc.font("medio").fontSize(tam);
+      const l = this.doc.widthOfString(rotulo) / MM, cx = xCota - s * (alt / 2 + 0.9), cy = (y1 + y2) / 2;
+      this.doc.save().translate(cx * MM, cy * MM).rotate(-90).fillColor(cor).text(rotulo, (-l / 2) * MM, (-alt / 2) * MM, { lineBreak: false }).restore();
+      this.caixas.push({ x: cx - alt / 2, y: cy - l / 2, l: alt, a: l, texto: rotulo, folha: this.folha, dono });
+      return;
+    }
     this.texto(rotulo, lado === "dir" ? xCota + 1.6 : xCota - 1.6, (y1 + y2) / 2 - alt / 2, { tam, fonte: "medio", cor, alinhar: lado === "dir" ? "esq" : "dir", dono });
   }
   // Chamada: ponto sobre o alvo, linha até o rótulo. lado = para onde o texto cresce.
