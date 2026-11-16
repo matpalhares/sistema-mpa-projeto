@@ -10,7 +10,7 @@ Projetos, propostas, memoriais e detalhamentos do escritório. Fase 1 concluída
   as abas Orçamento de obra e Cronograma só aparecem se o cliente contratou a execução.
 - Proposta comercial em DOCX e PDF no modelo visual aprovado (Proposta Cris Bebidas), com revisão automática de paginação.
 - Memorial descritivo completo e simplificado (prefeitura), em DOCX e PDF.
-- Áreas molhadas a partir da planta (Fase 2): o sistema lê os banheiros da planta (precisa da chave do Claude), você confere o desenho de cada ambiente e responde as perguntas obrigatórias (pedra, cuba, torneira, vaso, barras de acessibilidade, espelho, box, revestimentos). Saem o executivo A3 de cada ambiente (planta cotada, vistas, detalhe da bancada, quadro de pontos, notas, carimbo e perspectiva) e a marmoraria de cada bancada. As barras de apoio são locadas pela ABNT NBR 9050:2020, itens 7.6 e 7.7.2.2.
+- Áreas molhadas a partir da planta (Fase 2): o sistema lê os banheiros da planta, você confere o desenho de cada ambiente, marca vaso, bancada, cubas, box, chuveiro e ralo clicando em cima do recorte da planta e responde as perguntas obrigatórias (pedra, cuba, torneira, vaso, barras de acessibilidade, espelho, box, revestimentos). Saem o executivo A3 de cada ambiente (planta cotada, vistas, detalhe da bancada, quadro de pontos, notas, carimbo e perspectiva) e a marmoraria de cada bancada. As barras de apoio são locadas pela ABNT NBR 9050:2020, itens 7.6 e 7.7.2.2.
 - Marmoraria avulsa (Fase 2): prancha A4 da bancada com vista superior cotada, vista frontal, corte, perspectiva, fixação e lista de peças. O sistema só gera depois de responder pedra, cuba, torneira e medidas, e confere sozinho se algum texto ou cota ficou sobreposto.
 
 ## Como abrir no seu computador
@@ -40,7 +40,7 @@ Sem configuração nenhuma, tudo fica na pasta `dados` (banco e arquivos). **Fa�
 2. Copie o arquivo `.env.exemplo` com o nome `.env.local` e cole a chave depois de `ANTHROPIC_API_KEY=`.
 3. Feche e abra o sistema de novo.
 
-Sem a chave, você adiciona os ambientes do memorial à mão. A leitura é sempre aproximada e precisa da sua conferência.
+Sem a chave, a leitura funciona com PDF exportado direto do programa de desenho (vetorial, com cotas e nomes dos ambientes, paredes pintadas de cinza): o sistema lê os nomes, as medidas internas (conferindo o traço com as cotas escritas), a espessura das paredes e a porta. As louças e a bancada você marca clicando na planta. Foto, imagem ou PDF escaneado só são lidos com a chave. Toda leitura precisa da sua conferência.
 
 ## Ligar o Supabase (opcional, para dados na nuvem)
 

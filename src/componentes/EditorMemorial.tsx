@@ -136,10 +136,10 @@ export function EditorMemorial({ memorial, plantas, iaLigada, marcaDefinida, sig
             {plantas.length === 0 ? <p className="text-xs">Nenhuma planta enviada neste projeto. Envie na aba Arquivos do projeto, ou adicione os ambientes à mão abaixo.</p> : (
               <div className="flex flex-wrap items-center gap-2">
                 <select className="campo w-auto grow" value={planta} onChange={(e) => setPlanta(e.target.value)} aria-label="Planta">{plantas.map((p) => <option key={p.caminho} value={p.caminho}>{p.nome}</option>)}</select>
-                <button type="button" className="botao" onClick={ler} disabled={pendente || !iaLigada}>{pendente ? "Lendo..." : "Ler planta"}</button>
+                <button type="button" className="botao" onClick={ler} disabled={pendente}>{pendente ? "Lendo..." : "Ler planta"}</button>
               </div>
             )}
-            {!iaLigada && plantas.length > 0 && <p className="mt-2 text-xs">Leitura automática desligada: a chave da API do Claude ainda não foi cadastrada (veja o LEIA-ME). Adicione os ambientes à mão.</p>}
+            {!iaLigada && plantas.length > 0 && <p className="mt-2 text-xs">Sem a chave da API do Claude, a leitura funciona com PDF exportado direto do programa de desenho. Foto ou imagem da planta: adicione os ambientes à mão.</p>}
             {leitura && <p className="mt-2 text-xs">{leitura}</p>}
           </div>
           {d.ambientes.map((a, i) => (

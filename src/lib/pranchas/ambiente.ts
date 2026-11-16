@@ -13,7 +13,11 @@ export interface Chuveiro { parede: Parede; pos: number; registros: 1 | 2 }
 export interface Vaso { parede: Parede; eixo: number }
 export interface BancadaAmb { parede: Parede; inicio: number; comprimento: number; profundidade: number; cubas: number[] } // cubas: eixo a partir do início da bancada
 
+// Recorte da planta enviada, para o usuário marcar as peças em cima. x0/y0: pixel do canto interno noroeste do ambiente.
+export interface RecortePlanta { imagem: string; largura: number; altura: number; x0: number; y0: number; pxPorM: number }
+
 export interface Ambiente {
+  recorte?: RecortePlanta | null;
   nome: string;
   largura: number; // x (leste-oeste)
   comprimento: number; // y (norte-sul)

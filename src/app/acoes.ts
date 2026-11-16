@@ -12,6 +12,7 @@ import { NBR9050_PADRAO, respostasIniciais, type Ambiente, type ParametroNBR, ty
 import { bancadaInicial, type DadosBancada } from "@/lib/pranchas/regras-bancada";
 import { iaDisponivel, lerAreasMolhadas, lerPlanta, type LeituraPlanta } from "@/lib/ia";
 import { faltaNaMarca } from "@/lib/marca";
+import { lerPlantaVetorial, recortarAmbientes } from "@/lib/leitura-vetorial";
 
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const num = (v: string): number | null => {
@@ -229,7 +230,6 @@ export async function salvarEGerarMemorial(id: string, dados: DadosMemorial, tip
 
 export async function lerPlantaDoProjeto(projetoId: string, caminho: string): Promise<Resultado<LeituraPlanta>> {
   const { empresa } = await contexto();
-  if (!iaDisponivel()) return { ok: false, erros: ["A leitura automática está desligada: a chave da API do Claude ainda não foi cadastrada. Preencha os ambientes à mão ou cadastre a chave (veja o LEIA-ME)."] };
   const p = await obter<Projeto>("projetos", projetoId, empresa.id);
   const arq = p?.arquivos.find((a) => a.caminho === caminho);
   if (!p || !arq) return { ok: false, erros: ["Arquivo não encontrado no projeto."] };
@@ -238,6 +238,16 @@ export async function lerPlantaDoProjeto(projetoId: string, caminho: string): Pr
   if (!mime) return { ok: false, erros: ["A leitura automática aceita planta em PNG, JPG, WEBP ou PDF."] };
   const buf = await lerArquivo(caminho);
   if (!buf) return { ok: false, erros: ["Não consegui abrir o arquivo."] };
+  // PDF vetorial: os nomes dos ambientes saem do texto do próprio PDF, sem chave
+  if (mime === "application/pdf") {
+    try {
+      const l = await lerPlantaVetorial(buf);
+      const alturas = l.rotulos.map((r) => Math.round(r.alt * 2) / 2), comum = alturas.sort((a, b) => alturas.filter((x) => x === b).length - alturas.filter((x) => x === a).length)[0];
+      const nomes = [...new Set(l.rotulos.filter((r) => Math.abs(r.alt - comum) <= comum * 0.3).map((r) => r.nome))];
+      if (nomes.length >= 2) return { ok: true, dados: { ambientes: nomes.map((nome) => ({ nome, areaM2: null })), observacoes: "Nomes lidos do texto do PDF, sem inteligência artificial. Ambientes repetidos aparecem uma vez só. As áreas não foram lidas: preencha as que quiser." } };
+    } catch { /* segue para a leitura com a chave, se houver */ }
+  }
+  if (!iaDisponivel()) return { ok: false, erros: ["Sem a chave da API do Claude, a leitura só funciona com PDF exportado direto do programa de desenho (não com foto ou imagem). Preencha os ambientes à mão ou cadastre a chave (veja o LEIA-ME)."] };
   try {
     return { ok: true, dados: await lerPlanta(buf, mime) };
   } catch (e) {
@@ -292,25 +302,46 @@ export async function novoConjuntoMolhadas(f: FormData) {
   redirect(`/areas-molhadas/${cj.id}`);
 }
 
+// Leitura da planta para as áreas molhadas. PDF vetorial: lê pelo texto e pelo traço, sem chave. Imagem ou PDF escaneado: só com a chave da API.
 export async function lerAmbientesDaPlanta(id: string, caminho: string): Promise<Resultado<{ ambientes: Ambiente[]; observacoes: string }>> {
   const { empresa } = await contexto();
-  if (!iaDisponivel()) return { ok: false, erros: ["A leitura automática está desligada: a chave da API do Claude ainda não foi cadastrada (veja o LEIA-ME). Enquanto isso, adicione os ambientes à mão."] };
   const cj = await obter<ConjuntoMolhadas>("molhadas", id, empresa.id);
   const p = cj && (await obter<Projeto>("projetos", cj.projetoId, empresa.id));
   const arq = p?.arquivos.find((a) => a.caminho === caminho);
   if (!cj || !arq) return { ok: false, erros: ["Planta não encontrada no projeto."] };
   const ext = arq.nome.toLowerCase().split(".").pop() ?? "";
   const mime = ({ png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", pdf: "application/pdf" } as Record<string, string>)[ext];
-  if (!mime) return { ok: false, erros: ["A leitura automática aceita planta em PNG, JPG, WEBP ou PDF."] };
+  if (!mime) return { ok: false, erros: ["A leitura automática aceita planta em PDF, PNG, JPG ou WEBP."] };
   const buf = await lerArquivo(caminho);
   if (!buf) return { ok: false, erros: ["Não consegui abrir o arquivo."] };
+  let motivo = "A leitura sem a chave da API só funciona com PDF exportado direto do programa de desenho (não com foto ou imagem).";
+  if (mime === "application/pdf") {
+    try {
+      const l = await lerPlantaVetorial(buf);
+      if (l.ok) {
+        const recortes = await recortarAmbientes(buf, l.ambientes).catch(() => []);
+        const carimbo = Date.now();
+        const ambientes: Ambiente[] = [];
+        for (let i = 0; i < l.ambientes.length; i++) {
+          const r = recortes[i]; let recorte: Ambiente["recorte"] = null;
+          if (r) { const imagem = `${empresa.id}/molhadas/${cj.id}/recorte_${carimbo}_${i + 1}.png`; await salvarArquivo(imagem, r.png, "image/png"); recorte = { imagem, largura: r.largura, altura: r.altura, x0: r.x0, y0: r.y0, pxPorM: r.pxPorM }; }
+          ambientes.push({ ...l.ambientes[i].ambiente, recorte });
+        }
+        return { ok: true, dados: { ambientes, observacoes: l.observacoes } };
+      }
+      motivo = l.motivo ?? motivo;
+    } catch (e) {
+      motivo = "Não consegui ler o traço deste PDF: " + (e instanceof Error ? e.message : "erro desconhecido");
+    }
+  }
+  if (!iaDisponivel()) return { ok: false, erros: [motivo + " Você pode adicionar os ambientes à mão, ou cadastrar a chave da API do Claude para ler imagens (veja o LEIA-ME)."] };
   try {
     const l = await lerAreasMolhadas(buf, mime);
     const ambientes: Ambiente[] = l.ambientes.map((a) => ({
       ...a, acessivel: "", porta: a.porta ? { ...a.porta, altura: 2.1 } : null,
       chuveiro: a.chuveiro ? { ...a.chuveiro, registros: a.chuveiro.registros >= 2 ? 2 : 1 } : null,
     }));
-    return { ok: true, dados: { ambientes, observacoes: `${l.observacoes} Escala lida: ${l.escala}.` } };
+    return { ok: true, dados: { ambientes, observacoes: `${l.observacoes} Escala lida: ${l.escala}. Leitura feita por inteligência artificial: é aproximada.` } };
   } catch (e) {
     return { ok: false, erros: ["A leitura automática falhou: " + (e instanceof Error ? e.message : "erro desconhecido")] };
   }

@@ -5,6 +5,7 @@ import { TIPOS_BOX, TIPOS_CHUVEIRO, TIPOS_VASO, errosDoAmbiente, perguntasDoAmbi
 import { PEDRAS, TIPOS_CUBA, TIPOS_TORNEIRA } from "@/lib/pranchas/regras-bancada";
 import type { ArquivoRef, ConjuntoMolhadas, SaidaPrancha } from "@/lib/tipos";
 import { PreviaAmbiente } from "./PreviaAmbiente";
+import { MarcarNaPlanta } from "./MarcarNaPlanta";
 
 const paraNumero = (v: string): number | null => { if (!v.trim()) return null; const n = Number(v.replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
 const deNumero = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));
@@ -97,10 +98,10 @@ export function EditorMolhadas({ cj, plantas, iaLigada, marcaDefinida, sigla }: 
             <div className="flex flex-wrap items-center gap-2">
               <select className="campo w-auto grow" value={planta} onChange={(e) => { setPlanta(e.target.value); mexeu(); }} aria-label="Planta">{plantas.map((p) => <option key={p.caminho} value={p.caminho}>{p.nome}</option>)}</select>
               {planta && <a className="botao-leve" href={`/api/arquivo?c=${encodeURIComponent(planta)}&ver=1`} target="_blank">Abrir planta</a>}
-              <button type="button" className="botao" onClick={ler} disabled={pendente || !iaLigada || !planta}>{pendente ? "Lendo a planta..." : "Ler a planta e montar os ambientes"}</button>
+              <button type="button" className="botao" onClick={ler} disabled={pendente || !planta}>{pendente ? "Lendo a planta..." : "Ler a planta e montar os ambientes"}</button>
             </div>
           )}
-          {!iaLigada && <p className="rounded-lg bg-adefinir p-2 text-xs text-adefinir-texto">A leitura automática depende da chave da API do Claude, que ainda não foi cadastrada (veja o LEIA-ME). Enquanto isso, use &quot;Adicionar ambiente à mão&quot;.</p>}
+          <p className="text-xs text-cinza">{iaLigada ? "PDF exportado do programa de desenho é lido pelo texto e pelo traço. Foto ou imagem da planta é lida por inteligência artificial." : "Sem a chave da API do Claude, a leitura funciona com PDF exportado direto do programa de desenho, com cotas e nomes dos ambientes. Foto ou imagem: adicione o ambiente à mão."}</p>
           {leitura && <p className="rounded-lg bg-[#DDEBF7] p-2 text-xs">{leitura}</p>}
           <button type="button" className="botao-leve" onClick={() => { setAmbientes((l) => [...l, novoAmbiente(l.length + 1)]); setR((x) => ({ ...x, modeloConferido: false })); mexeu(); }}>+ Adicionar ambiente à mão</button>
         </section>
@@ -111,8 +112,9 @@ export function EditorMolhadas({ cj, plantas, iaLigada, marcaDefinida, sigla }: 
               <h2 className="titulo grow text-sm">Ambiente: <input className="campo ml-1 inline w-48 py-1 font-semibold" value={a.nome} aria-label={`Nome do ambiente ${i + 1}`} onChange={(e) => ambSemDesconferir(i, { nome: e.target.value })} /></h2>
               <button type="button" className="text-sm text-vermelho underline" onClick={() => { setAmbientes((l) => l.filter((_, k) => k !== i)); mexeu(); }}>Remover</button>
             </div>
+            {a.recorte && <MarcarNaPlanta a={a} aoMudar={(patch) => amb(i, patch)} />}
             <div className="flex flex-wrap gap-4">
-              <PreviaAmbiente a={a} />
+              <div><p className="mb-1 text-xs text-cinza">Como vai para a prancha:</p><PreviaAmbiente a={a} /></div>
               <div className="min-w-56 grow space-y-2 text-sm">
                 <p><strong>{deNumero(a.largura)} x {deNumero(a.comprimento)} m</strong> (largura x comprimento, por dentro)</p>
                 <ul className="list-inside list-disc text-cinza">
@@ -125,7 +127,7 @@ export function EditorMolhadas({ cj, plantas, iaLigada, marcaDefinida, sigla }: 
               </div>
             </div>
             <details className="rounded-xl bg-bege/30 p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-azul">Corrigir a leitura deste ambiente</summary>
+              <summary className="cursor-pointer text-sm font-semibold text-azul">Corrigir medidas e posições digitando</summary>
               <p className="my-2 text-xs text-cinza">Medidas em metros. Nas paredes de cima e de baixo, as posições são medidas a partir da parede da esquerda; nas paredes da esquerda e da direita, a partir da parede de cima.</p>
               <div className="grid gap-2 sm:grid-cols-4">
                 <Num rotulo="Largura (horizontal)" valor={a.largura} aoMudar={(v) => amb(i, { largura: v })} />

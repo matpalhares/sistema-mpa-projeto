@@ -5,7 +5,7 @@ const origens = (process.env.MPA_ORIGENS ?? "").split(",").map((x) => x.trim()).
 
 const nextConfig: NextConfig = {
   ...(origens.length ? { experimental: { serverActions: { allowedOrigins: origens } } } : {}),
-  serverExternalPackages: ["pdfjs-dist", "docx", "sharp", "pdfkit"],
+  serverExternalPackages: ["pdfjs-dist", "docx", "sharp", "pdfkit", "@napi-rs/canvas"],
   outputFileTracingIncludes: { "/**": ["./recursos/**"] },
   turbopack: {
     rules: {
