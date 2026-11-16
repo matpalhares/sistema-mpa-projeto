@@ -1,0 +1,7 @@
+node_modules
+.next
+dados
+.git
+.env*
+testes
+tsconfig.tsbuildinfo
