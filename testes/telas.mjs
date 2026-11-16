@@ -1,0 +1,91 @@
+// Teste das telas pelo navegador (precisa do app rodando). Uso: node testes/telas.mjs http://localhost:3000 [pasta-de-prints]
+// Cobre: primeiro acesso, projeto, T10 (abas ocultas sem execução), proposta, memorial, marca a definir.
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)("playwright");
+const base = process.argv[2] || "http://localhost:3000";
+const prints = process.argv[3];
+let falhas = 0;
+const conferir = (nome, ok) => { console.log(`${ok ? "  ✓" : "  ✕"} ${nome}`); if (!ok) falhas++; };
+const b = await chromium.launch();
+const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
+const foto = async (n) => prints && pg.screenshot({ path: `${prints}/${n}.png`, fullPage: true });
+const erros = []; pg.on("pageerror", (e) => erros.push(e.message));
+
+await pg.goto(base);
+conferir("sem usuário, abre Primeiro acesso", pg.url().includes("/primeiro-acesso"));
+await pg.fill('input[name=nome]', "Usuário de Teste"); await pg.fill('input[name=email]', "teste@exemplo.com"); await pg.fill('input[name=senha]', "senha-de-teste");
+await pg.click("button:has-text('Criar meu usuário')"); await pg.waitForURL(base + "/");
+conferir("entra no Painel", await pg.locator("h1:has-text('Painel')").isVisible());
+await foto("1-painel-vazio");
+
+await pg.click("text=+ Novo projeto");
+await pg.fill('input[name=clienteNome]', "Cliente de Teste"); await pg.fill('input[name=obra]', "Residência de Teste");
+await pg.click("text=Não, só o projeto"); await pg.click("button:has-text('Criar projeto')"); await pg.waitForURL(/projetos\/[0-9a-f-]{36}/);
+const urlProjeto = pg.url().split("?")[0];
+console.log("T10  Abas de execução");
+conferir("sem execução: aba Cronograma oculta", (await pg.locator("nav[aria-label='Abas do projeto'] >> text=Cronograma").count()) === 0);
+conferir("sem execução: aba Orçamento de obra oculta", (await pg.locator("nav[aria-label='Abas do projeto'] >> text=Orçamento de obra").count()) === 0);
+await foto("2-projeto");
+await pg.goto(urlProjeto + "?aba=cronograma");
+conferir("sem execução: endereço direto da aba não mostra nada", (await pg.locator("text=Gantt").count()) === 0);
+await pg.goto(urlProjeto + "?aba=dados"); await pg.click("text=Sim, contratou a execução"); await pg.click("button:has-text('Salvar dados')"); await pg.waitForSelector("text=Dados salvos");
+await pg.goto(urlProjeto);
+conferir("com execução: abas Orçamento de obra e Cronograma aparecem", (await pg.locator("nav[aria-label='Abas do projeto'] >> text=Cronograma").count()) === 1 && (await pg.locator("nav[aria-label='Abas do projeto'] >> text=Orçamento de obra").count()) === 1);
+await pg.click("button[name=etapa][value='3']"); await pg.waitForTimeout(600);
+conferir("etapa atual muda ao clicar", (await pg.locator("button[name=etapa][value='3']").innerText()).includes("agora"));
+
+console.log("Proposta");
+await pg.click("button:has-text('Gerar proposta')"); await pg.waitForURL(/propostas\//);
+conferir("cliente veio do projeto", (await pg.locator("label:has-text('Nome do cliente') input").inputValue()) === "Cliente de Teste");
+await pg.click("button:has-text('Projeto de interiores')"); await pg.click("button:has-text('15 dias')");
+await pg.click("text=+ Adicionar item do escopo"); await pg.fill("input[aria-label='Item 1']", "Projeto executivo de interiores");
+await pg.fill("input[placeholder='a definir'][inputmode=decimal]", "12.000,00");
+conferir("mostra cálculo à vista (R$ 11.400,00)", await pg.locator("text=11.400,00").first().isVisible());
+await pg.fill("input[aria-label='Item 1']", "Projeto executivo de interiores completo");
+conferir("campo de lista mantém o foco ao digitar", await pg.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Item 1"));
+await foto("3-proposta");
+await pg.click("button:has-text('Gerar proposta (DOCX + PDF)')"); await pg.waitForSelector("text=Proposta gerada", { timeout: 120000 });
+conferir("proposta gerada com revisão de paginação", await pg.locator("text=Sem páginas em branco").isVisible());
+const resp = await pg.request.get(base + (await pg.locator("a:has-text('Abrir PDF')").getAttribute("href")));
+conferir("PDF abre pelo link", resp.status() === 200 && (await resp.body()).subarray(0, 4).toString() === "%PDF");
+await foto("4-proposta-gerada");
+
+console.log("Memorial");
+await pg.goto(urlProjeto); await pg.click("button:has-text('Gerar memorial')"); await pg.waitForURL(/memoriais\//);
+conferir("sem escolher o tipo, não gera", await pg.locator("button:has-text('Gerar memorial (DOCX + PDF)')").isDisabled());
+await pg.click("button:has-text('Os dois')");
+await pg.click("text=+ Adicionar ambiente"); await pg.fill("input[aria-label='Nome do ambiente 1']", "Sala");
+await pg.fill("input[aria-label='Piso: tipo']", "Porcelanato 60x60");
+conferir("avisa medida no tipo e bloqueia", await pg.locator("text=Tire a medida daqui").isVisible());
+await pg.fill("input[aria-label='Piso: tipo']", "Porcelanato"); await pg.fill("input[aria-label='Piso: medida']", "60x60 cm");
+conferir("sem conferir ambientes, não gera", await pg.locator("button:has-text('Gerar memorial (DOCX + PDF)')").isDisabled());
+await pg.check("input[type=checkbox]");
+await pg.click("button:has-text('Radier')");
+await foto("5-memorial");
+await pg.click("button:has-text('Gerar memorial (DOCX + PDF)')"); await pg.waitForSelector("text=Memorial gerado", { timeout: 180000 });
+conferir("memorial gerado nos dois tipos", (await pg.locator("a:has-text('Abrir PDF')").count()) === 2);
+await foto("6-memorial-gerado");
+
+console.log("Empresas e isolamento");
+await pg.goto(base); await foto("7-painel");
+conferir("Painel mostra o projeto e pendências", await pg.locator("text=Residência de Teste").first().isVisible() && await pg.locator("h2:has-text('Falta preencher')").isVisible());
+await pg.selectOption("select[name=empresa]", "lm"); await pg.waitForTimeout(800);
+conferir("LM não vê projetos da MPA", (await pg.locator("text=Residência de Teste").count()) === 0);
+conferir("LM avisa marca a definir", await pg.locator("text=está a definir").first().isVisible());
+conferir("LM não abre projeto da MPA pelo endereço", (await pg.request.get(urlProjeto)).status() === 404);
+await pg.goto(base + "/empresas"); await foto("8-empresas");
+await pg.selectOption("select[name=empresa]", "mpa"); await pg.waitForTimeout(500);
+await pg.click("text=Sair"); await pg.waitForURL(/login/);
+conferir("sem login, o Painel redireciona", (await (await b.newPage()).goto(base).then((r) => r.url())).includes("/login"));
+conferir("sem login, arquivo não baixa", !(await (await b.newContext()).request.get(base + "/api/arquivo?c=mpa/x.pdf").then((r) => r.url())).includes("/api/arquivo") );
+await pg.fill('input[name=email]', "teste@exemplo.com"); await pg.fill('input[name=senha]', "errada123"); await pg.click("button:has-text('Entrar')");
+conferir("senha errada é recusada", await pg.locator("text=E-mail ou senha incorretos").waitFor({ timeout: 8000 }).then(() => true, () => false));
+// celular
+await pg.fill('input[name=email]', "teste@exemplo.com"); await pg.fill('input[name=senha]', "senha-de-teste"); await pg.click("button:has-text('Entrar')"); await pg.waitForURL(base + "/");
+await pg.setViewportSize({ width: 390, height: 800 }); await pg.goto(base);
+conferir("no celular não há rolagem lateral", await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+await foto("9-celular");
+conferir("nenhum erro de script nas telas", erros.length === 0); if (erros.length) console.log(erros);
+await b.close();
+console.log(falhas ? `\n${falhas} FALHA(S)` : "\nTodos os testes de tela passaram.");
+process.exit(falhas ? 1 : 0);

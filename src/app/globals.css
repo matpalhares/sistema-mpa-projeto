@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-azul: #0D2F63;
+  --color-azul-claro: #1B4688;
+  --color-dourado: #C79B63;
+  --color-dourado-escuro: #8A6532;
+  --color-offwhite: #F7F4EE;
+  --color-bege: #E8DFD2;
+  --color-begelinha: #D9C9A3;
+  --color-adefinir: #FFF2B3;
+  --color-adefinir-texto: #7A4B00;
+  --color-verde: #1E7B34;
+  --color-vermelho: #B3261E;
+  --color-tinta: #23262D;
+  --color-cinza: #5E6470;
+  --font-sans: "Montserrat", system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+body { background: var(--color-offwhite); color: var(--color-tinta); font-family: var(--font-sans); }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .titulo { @apply font-semibold uppercase tracking-wide text-azul; }
+  .cartao { @apply rounded-2xl border border-begelinha bg-white p-5 shadow-sm; }
+  .campo { @apply w-full rounded-lg border border-begelinha bg-white px-3 py-2 text-sm text-tinta outline-none focus:border-azul focus:ring-2 focus:ring-azul/20; }
+  .campo-vazio { @apply border-dashed bg-adefinir/60; }
+  .rotulo { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-cinza; }
+  .botao { @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-azul px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-azul-claro disabled:cursor-not-allowed disabled:opacity-50; }
+  .botao-ouro { @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-dourado px-4 py-2.5 text-sm font-semibold text-azul transition hover:brightness-95 disabled:opacity-50; }
+  .botao-leve { @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-begelinha bg-white px-3 py-2 text-sm font-semibold text-azul transition hover:bg-bege disabled:opacity-50; }
+  .etiqueta { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .adefinir { @apply inline-flex items-center rounded-full bg-adefinir px-2.5 py-0.5 text-xs font-semibold text-adefinir-texto; }
+  .opcao { @apply cursor-pointer rounded-xl border border-begelinha bg-white px-3 py-2 text-left text-sm transition hover:border-azul hover:bg-bege; }
+  .opcao-ativa { @apply border-azul bg-azul text-white hover:bg-azul; }
+  .aviso { @apply rounded-xl border border-vermelho/30 bg-vermelho/5 p-3 text-sm text-vermelho; }
+  .sucesso { @apply rounded-xl border border-verde/30 bg-verde/5 p-3 text-sm text-verde; }
 }
