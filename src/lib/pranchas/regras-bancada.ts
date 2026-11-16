@@ -47,6 +47,8 @@ export interface DadosBancada {
   revisao: number;
   medidasConfirmadas: boolean; // o usuário conferiu as medidas (a leitura da planta é aproximada)
   observacoes: string;
+  saia?: number; // altura da saia; padrão 0,20 m. Em sanitário acessível: 0,07 m, para deixar 0,73 m livres (NBR 9050, 7.10.3)
+  alturaTampo?: number; // topo do tampo; padrão 0,85 m. Em sanitário acessível: 0,80 m (NBR 9050, 7.5 e)
 }
 
 export function bancadaInicial(base: Partial<DadosBancada> = {}): DadosBancada {
@@ -103,7 +105,7 @@ export function pecasBancada(d: DadosBancada): Peca[] {
   const paredes = [d.lateralEsquerda, d.lateralDireita].filter((x) => x === "parede").length;
   const abertas = [d.lateralEsquerda, d.lateralDireita].filter((x) => x === "aberta").length;
   if (paredes) pecas.push({ nome: "Frontão lateral", qtd: paredes, comprimento: P, largura: PADRAO.frontaoAlt, espessura: PADRAO.frontaoEsp, calculo: "uma peça para cada lateral encostada na parede: profundidade x 10 cm" });
-  pecas.push({ nome: "Saia frontal", qtd: 1, comprimento: C, largura: PADRAO.saia, espessura: PADRAO.tampo, calculo: "comprimento da bancada x 20 cm de altura (padrão)" });
-  if (abertas) pecas.push({ nome: "Saia lateral", qtd: abertas, comprimento: P, largura: PADRAO.saia, espessura: PADRAO.tampo, calculo: "uma peça para cada lateral aberta (sem frontão, com saia): profundidade x 20 cm" });
+  pecas.push({ nome: "Saia frontal", qtd: 1, comprimento: C, largura: d.saia ?? PADRAO.saia, espessura: PADRAO.tampo, calculo: d.saia ? "comprimento da bancada x altura da saia reduzida do sanitário acessível (NBR 9050)" : "comprimento da bancada x 20 cm de altura (padrão)" });
+  if (abertas) pecas.push({ nome: "Saia lateral", qtd: abertas, comprimento: P, largura: d.saia ?? PADRAO.saia, espessura: PADRAO.tampo, calculo: "uma peça para cada lateral aberta (sem frontão, com saia): profundidade x 20 cm" });
   return pecas;
 }

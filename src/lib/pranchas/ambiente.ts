@@ -74,6 +74,12 @@ export const nbr = (lista: ParametroNBR[] = NBR9050_PADRAO): NBR => Object.fromE
 // z1 = altura do eixo (horizontais) ou da base (vertical); z2 = topo da barra vertical
 export interface Barra { parede: Parede; de: number; ate: number; tipo: "lateral" | "fundo" | "vertical"; z1: number; z2: number }
 
+// Topo do tampo: padrão do escritório 0,85 m. Em sanitário acessível segue a ABNT NBR 9050:2020, 7.5 e (0,78 a 0,80 m): usa 0,80 m.
+export const alturaTampoDe = (a: Ambiente) => (a.acessivel === "sim" ? 0.8 : PADRAO.alturaTampo);
+
+// Saia: padrão 20 cm. Em sanitário acessível a norma pede 0,73 m livres sob o lavatório (7.10.3): com o tampo a 0,80 m, a saia fica com 7 cm.
+export const saiaDe = (a: Ambiente) => (a.acessivel === "sim" ? 0.07 : PADRAO.saia);
+
 export const comprimentoParede = (a: Ambiente, p: Parede) => (p === "N" || p === "S" ? a.largura : a.comprimento);
 const perpendiculares = (p: Parede): [Parede, Parede] => (p === "N" || p === "S" ? ["O", "L"] : ["N", "S"]);
 // distância de um ponto encostado na parede p (a "dist" da parede) medida ao longo de uma parede perpendicular
@@ -104,7 +110,7 @@ export function barrasDoAmbiente(a: Ambiente, n: NBR, caixaAcoplada: boolean): {
     if (caixaAcoplada) avisos.push(`${a.nome}: com caixa acoplada, a barra do fundo foi posta a ${m(n.alturaFundoCaixa)} m (NBR 9050, 7.7.2.2.3). Conferir se fica a pelo menos 0,04 m acima da tampa da caixa do modelo escolhido.`);
   }
   if (a.porta && a.porta.abre === "dentro") avisos.push(`${a.nome}: a porta abre para dentro. A NBR 9050 (item 7.5, alínea f) pede que a porta de eixo vertical do sanitário acessível abra para o lado externo, com puxador horizontal interno de no mínimo 0,40 m.`);
-  if (a.bancadas.length) avisos.push(`${a.nome}: a NBR 9050 (item 7.5, alínea e) pede a superfície superior do lavatório acessível entre 0,78 m e 0,80 m. O padrão do escritório usado no desenho é ${m(PADRAO.alturaTampo)} m: definir qual altura vale neste ambiente.`);
+  if (a.bancadas.length) avisos.push(`${a.nome}: por ser acessível, a bancada segue a NBR 9050 no lugar do padrão do escritório: tampo a 0,80 m (em vez de ${m(PADRAO.alturaTampo)} m) e saia de 7 cm (em vez de 20 cm), para deixar 0,73 m livres embaixo (itens 7.5 e 7.10.3). Sifão e ligações devem ficar protegidos ou recuados.`);
   avisos.push(`${a.nome}: conferir na NBR 9050 (itens 7.5 e 7.7.1) a área de giro e a área de transferência; o sistema ainda não verifica essas áreas.`);
   return { barras, avisos };
 }
@@ -129,7 +135,7 @@ export function bancadaDoAmbiente(a: Ambiente, i: number, r: RespostasAmbiente):
     cubaCentralizada: eixo == null ? null : Math.abs(eixo - b.comprimento / 2) < 0.005, cubaEixo: eixo,
     torneira: semCuba ? "Sem torneira" : r.torneira, revestimentosDefinidos: r.revestimentosDefinidos, revestimentoPiso: r.revestimentoPiso, revestimentoParede: r.revestimentoParede, corPorta: r.corPorta, pintura: r.pintura,
     grapas: r.grapas === "A" || r.grapas === "B" ? r.grapas : b.comprimento <= 1 ? "A" : "B",
-    cliente: r.cliente, local: r.local, data: r.data, revisao: r.revisao, medidasConfirmadas: r.modeloConferido,
+    cliente: r.cliente, local: r.local, data: r.data, revisao: r.revisao, medidasConfirmadas: r.modeloConferido, alturaTampo: alturaTampoDe(a), saia: a.acessivel === "sim" ? saiaDe(a) : undefined,
   });
 }
 

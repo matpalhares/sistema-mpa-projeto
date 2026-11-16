@@ -7,7 +7,7 @@ import { imagem } from "../documentos/comum";
 import { COR, Prancha, metros, type Sobreposicao } from "./folha";
 import { renderizar, type Solido, type V3 } from "./iso";
 import { PADRAO } from "./regras-bancada";
-import { ALTURA, NOME_PAREDE, barrasDoAmbiente, comprimentoParede, lateraisDaBancada, nbr, type Ambiente, type BancadaAmb, type Barra, type NBR, type Parede, type RespostasAmbiente } from "./ambiente";
+import { ALTURA, NOME_PAREDE, alturaTampoDe, saiaDe, barrasDoAmbiente, comprimentoParede, lateraisDaBancada, nbr, type Ambiente, type BancadaAmb, type Barra, type NBR, type Parede, type RespostasAmbiente } from "./ambiente";
 
 const AZUL_VIDRO = "#2F86C4", LARANJA = "#F28C28";
 const corPedraRGB = (nome: string): V3 => (/bege bahia/i.test(nome) ? [222, 205, 172] : /ita[uú]nas/i.test(nome) ? [232, 228, 218] : /preto|gabriel/i.test(nome) ? [52, 52, 56] : /verde/i.test(nome) ? [58, 78, 66] : /cinza/i.test(nome) ? [168, 168, 170] : [228, 222, 210]);
@@ -256,13 +256,13 @@ function vistaInterna(pr: Prancha, a: Ambiente, r: RespostasAmbiente, barras: Ba
   }
   // bancadas (de frente nesta parede; de perfil se encostam nela pela ponta)
   for (const b of a.bancadas) {
-    const zT = PADRAO.alturaTampo;
+    const zT = alturaTampoDe(a);
     if (b.parede === p) {
       const t1 = Math.min(naVista(a, p, b.inicio), naVista(a, p, b.inicio + b.comprimento)); cortes.add(t1); cortes.add(t1 + b.comprimento);
       if (r.espelho === "sim") { pr.ret(X(t1), Z(ALTURA.espelhoAte), b.comprimento * s, (ALTURA.espelhoAte - ALTURA.espelhoDe) * s, { fundo: "#E3ECF3", cor: AZUL_VIDRO, esp: 0.2 }); pr.texto("ESPELHO", X(t1 + b.comprimento / 2), Z(1.68), { tam: 4.6, cor: AZUL_VIDRO, alinhar: "centro" }); pr.texto("1,15 a 2,10 m", X(t1 + b.comprimento / 2), Z(1.6), { tam: 4, cor: AZUL_VIDRO, alinhar: "centro" }); }
       pr.ret(X(t1), Z(zT + PADRAO.frontaoAlt), b.comprimento * s, PADRAO.frontaoAlt * s, { fundo: pedra, cor: COR.preto, esp: 0.25 });
-      pr.ret(X(t1), Z(zT), b.comprimento * s, PADRAO.saia * s, { fundo: pedra, cor: COR.preto, esp: 0.3 });
-      pontilhado(pr, X(t1) + 0.3, Z(zT + PADRAO.frontaoAlt) + 0.3, b.comprimento * s - 0.6, (PADRAO.frontaoAlt + PADRAO.saia) * s - 0.6, 11);
+      pr.ret(X(t1), Z(zT), b.comprimento * s, saiaDe(a) * s, { fundo: pedra, cor: COR.preto, esp: 0.3 });
+      pontilhado(pr, X(t1) + 0.3, Z(zT + PADRAO.frontaoAlt) + 0.3, b.comprimento * s - 0.6, (PADRAO.frontaoAlt + saiaDe(a)) * s - 0.6, 11);
       for (const c of b.cubas) {
         const tc = naVista(a, p, b.inicio + c);
         if (r.torneira.startsWith("Mesa")) { pr.ret(X(tc) - 0.5, Z(zT + 0.14), 1, 0.14 * s, { fundo: "#8A8A8A", cor: COR.preto, esp: 0.12 }); pr.ret(X(tc) - 2, Z(zT + 0.01), 4, 0.5, { fundo: "#8A8A8A" }); }
@@ -277,7 +277,7 @@ function vistaInterna(pr: Prancha, a: Ambiente, r: RespostasAmbiente, barras: Ba
       if ((noInicio && lat.inicio === "parede") || (!noInicio && lat.fim === "parede")) {
         const t1 = b.parede === esq ? 0 : L - b.profundidade; cortes.add(b.parede === esq ? b.profundidade : L - b.profundidade);
         pr.ret(X(t1), Z(zT + PADRAO.frontaoAlt), b.profundidade * s, PADRAO.frontaoAlt * s, { fundo: pedra, cor: COR.preto, esp: 0.25 });
-        pr.ret(X(t1), Z(zT), b.profundidade * s, PADRAO.saia * s, { fundo: pedra, cor: COR.preto, esp: 0.3 });
+        pr.ret(X(t1), Z(zT), b.profundidade * s, saiaDe(a) * s, { fundo: pedra, cor: COR.preto, esp: 0.3 });
       }
     }
   }
@@ -317,8 +317,8 @@ function vistaInterna(pr: Prancha, a: Ambiente, r: RespostasAmbiente, barras: Ba
   }
   // cotas: alturas à direita, cadeia horizontal embaixo
   const xc = X(L) + 8;
-  pr.cotaV(Z(PADRAO.alturaTampo), yPiso, X(L), xc, metros(PADRAO.alturaTampo), { tam: 6, vertical: true });
-  pr.cotaV(Z(ALTURA.porta), Z(PADRAO.alturaTampo), X(L), xc, metros(ALTURA.porta - PADRAO.alturaTampo), { tam: 6, vertical: true });
+  pr.cotaV(Z(alturaTampoDe(a)), yPiso, X(L), xc, metros(alturaTampoDe(a)), { tam: 6, vertical: true });
+  pr.cotaV(Z(ALTURA.porta), Z(alturaTampoDe(a)), X(L), xc, metros(ALTURA.porta - alturaTampoDe(a)), { tam: 6, vertical: true });
   pr.cotaV(Z(PD), Z(ALTURA.porta), X(L), xc, metros(PD - ALTURA.porta), { tam: 6, vertical: true });
   const q = [...cortes].map((v) => Math.round(Math.min(L, Math.max(0, v)) * 100) / 100).sort((m, n) => m - n).filter((v, i, arr) => i === 0 || v - arr[i - 1] >= 0.05);
   if (q[q.length - 1] !== Math.round(L * 100) / 100) q[q.length - 1] = L;
@@ -353,16 +353,16 @@ function detalheBancada(pr: Prancha, a: Ambiente, b: BancadaAmb, r: RespostasAmb
   pr.cotaV(y0, y0 + P * s, xd, xd + (cubas.length ? 16 : 8), metros(P), { tam: 6, vertical: true });
   // corte transversal
   const yc = y0 + P * s + 20, sc = Math.min(48 / P, 60), wx = x + 20, e = Math.max(PADRAO.tampo * sc, 0.9), xF = wx + P * sc;
-  pr.ret(wx - 5, yc - PADRAO.frontaoAlt * sc - 4, 5, 26, { fundo: COR.parede }); pr.hachura(wx - 5, yc - PADRAO.frontaoAlt * sc - 4, 5, 26, 1.4, "#8A8A8A");
+  const hp = PADRAO.frontaoAlt * sc + 4 + saiaDe(a) * sc + 4; pr.ret(wx - 5, yc - PADRAO.frontaoAlt * sc - 4, 5, hp, { fundo: COR.parede }); pr.hachura(wx - 5, yc - PADRAO.frontaoAlt * sc - 4, 5, hp, 1.4, "#8A8A8A");
   pr.ret(wx, yc - PADRAO.frontaoAlt * sc, e, PADRAO.frontaoAlt * sc, { fundo: pedra, cor: COR.preto, esp: 0.3 });
   pr.ret(wx, yc, P * sc, e, { fundo: pedra, cor: COR.preto, esp: 0.3 });
-  pr.ret(xF - e, yc + e, e, PADRAO.saia * sc - e, { fundo: pedra, cor: COR.preto, esp: 0.3 });
+  pr.ret(xF - e, yc + e, e, saiaDe(a) * sc - e, { fundo: pedra, cor: COR.preto, esp: 0.3 });
   pr.ret(wx - PADRAO.grapaEmbutida * sc, yc + e, xF - e - PADRAO.grapaFolgaSaia * sc - (wx - PADRAO.grapaEmbutida * sc), 0.03 * sc, { fundo: "#C0392B", cor: COR.preto, esp: 0.15 });
   if (cubas.length) { const c1 = wx + (meio - cp / 2) * sc, c2 = wx + (meio + cp / 2) * sc; pr.poligono([[c1, yc + e], [c1 + 1, yc + e + 0.12 * sc], [c2 - 1, yc + e + 0.12 * sc], [c2, yc + e]], { cor: COR.preto, esp: 0.3 }); }
-  const ch: [number, number, string][] = [[wx + e / 2, yc - PADRAO.frontaoAlt * sc * 0.55, "FRONTÃO e=0,02 / h=0,10"], [wx + P * sc * 0.85, yc + e / 2, "TAMPO e=0,02"], [wx + P * sc * 0.3, yc + e + 0.015 * sc, "GRAPA (METALON 40x30 OU BARRA Ø40)"], [xF - e / 2, yc + PADRAO.saia * sc * 0.75, "SAIA h=0,20 (face inferior a 0,65)"]];
+  const ch: [number, number, string][] = [[wx + e / 2, yc - PADRAO.frontaoAlt * sc * 0.55, "FRONTÃO e=0,02 / h=0,10"], [wx + P * sc * 0.85, yc + e / 2, "TAMPO e=0,02"], [wx + P * sc * 0.3, yc + e + 0.015 * sc, "GRAPA (METALON 40x30 OU BARRA Ø40)"], [xF - e / 2, yc + saiaDe(a) * sc * 0.75, `SAIA h=${metros(saiaDe(a)).replace(" m", "")} (face inferior a ${metros(alturaTampoDe(a) - saiaDe(a)).replace(" m", "")})`]];
   ch.forEach(([ax, ay, t], i) => pr.chamada(ax, ay, xF + 8, yc - 7 + i * 4, t, { tam: 4.8 }));
-  pr.cotaH(wx, xF, yc + PADRAO.saia * sc, yc + PADRAO.saia * sc + 5, metros(P), { tam: 5.6 });
-  pr.texto("CORTE TRANSVERSAL NO EIXO DA CUBA (sem escala)", x, yc + PADRAO.saia * sc + 10, { tam: 5, cor: COR.cinza });
+  pr.cotaH(wx, xF, yc + saiaDe(a) * sc, yc + saiaDe(a) * sc + 5, metros(P), { tam: 5.6 });
+  pr.texto("CORTE TRANSVERSAL NO EIXO DA CUBA (sem escala)", x, yc + saiaDe(a) * sc + 10, { tam: 5, cor: COR.cinza });
 }
 
 // ---------------- QUADRO E NOTAS ----------------
@@ -397,7 +397,8 @@ function quadro(pr: Prancha, a: Ambiente, r: RespostasAmbiente, barras: Barra[],
 function notas(pr: Prancha, r: RespostasAmbiente, x: number, y: number, larg: number, lista: string[]) {
   pr.texto("NOTAS", x, y, { tam: 7, fonte: "forte", cor: COR.azul });
   let yn = y + 4.6;
-  lista.forEach((n, i) => { pr.texto(`${i + 1}.`, x, yn, { tam: 4.8, livre: true }); yn += pr.paragrafo(n, x + 3.2, yn, larg - 3.2, { tam: 4.8, entre: 0.35 }) + 0.9; });
+  const tam = lista.length > 6 ? 4.1 : 4.8, entre = lista.length > 6 ? 0.2 : 0.35;
+  lista.forEach((n, i) => { pr.texto(`${i + 1}.`, x, yn, { tam, livre: true }); yn += pr.paragrafo(n, x + 3.2, yn, larg - 3.2, { tam, entre }) + (lista.length > 6 ? 0.5 : 0.9); });
   void r;
 }
 
@@ -446,7 +447,7 @@ function cenaAmbiente(a: Ambiente, r: RespostasAmbiente, barras: Barra[], n: NBR
     if (!semCaixa(r)) { s.push(naParede(v.parede, v.eixo - 0.27, v.eixo - 0.23, 0, 0.02, ALTURA.vasoAF - 0.02, ALTURA.vasoAF + 0.02, [47, 134, 196])); alvos.push(["Ponto de água do vaso: AF h = 0,25 m, lado esquerdo", P3(v.parede, v.eixo - 0.25, 0.02, ALTURA.vasoAF)]); }
   }
   a.bancadas.forEach((b) => {
-    const z = PADRAO.alturaTampo, e = PADRAO.tampo, lat = lateraisDaBancada(a, b), f = b.inicio + b.comprimento;
+    const z = alturaTampoDe(a), e = PADRAO.tampo, lat = lateraisDaBancada(a, b), f = b.inicio + b.comprimento;
     const cl = r.cubaLargura ?? 0.3, cp = r.cubaProfundidade ?? 0.3, meio = (b.profundidade + PADRAO.frontaoEsp) / 2, rec = r.cubaTipo !== "Sobrepor" && b.cubas.length > 0;
     const pd: Partial<Solido> = { pedra: true };
     if (rec) {
@@ -466,15 +467,15 @@ function cenaAmbiente(a: Ambiente, r: RespostasAmbiente, barras: Barra[], n: NBR
       for (const c of b.cubas) s.push(naParede(b.parede, b.inicio + c - cl / 2, b.inicio + c + cl / 2, meio - cp / 2, meio + cp / 2, z, z + 0.13, louca));
     }
     s.push(naParede(b.parede, b.inicio, f, 0, PADRAO.frontaoEsp, z, z + PADRAO.frontaoAlt, pedra, pd));
-    s.push(naParede(b.parede, b.inicio, f, b.profundidade - e, b.profundidade, z - PADRAO.saia, z - e, pedra, pd));
-    if (lat.inicio === "parede") s.push(naParede(b.parede, b.inicio, b.inicio + PADRAO.frontaoEsp, PADRAO.frontaoEsp, b.profundidade, z, z + PADRAO.frontaoAlt, pedra, pd)); else s.push(naParede(b.parede, b.inicio, b.inicio + e, 0, b.profundidade - e, z - PADRAO.saia, z - e, pedra, pd));
-    if (lat.fim === "parede") s.push(naParede(b.parede, f - PADRAO.frontaoEsp, f, PADRAO.frontaoEsp, b.profundidade, z, z + PADRAO.frontaoAlt, pedra, pd)); else s.push(naParede(b.parede, f - e, f, 0, b.profundidade - e, z - PADRAO.saia, z - e, pedra, pd));
+    s.push(naParede(b.parede, b.inicio, f, b.profundidade - e, b.profundidade, z - saiaDe(a), z - e, pedra, pd));
+    if (lat.inicio === "parede") s.push(naParede(b.parede, b.inicio, b.inicio + PADRAO.frontaoEsp, PADRAO.frontaoEsp, b.profundidade, z, z + PADRAO.frontaoAlt, pedra, pd)); else s.push(naParede(b.parede, b.inicio, b.inicio + e, 0, b.profundidade - e, z - saiaDe(a), z - e, pedra, pd));
+    if (lat.fim === "parede") s.push(naParede(b.parede, f - PADRAO.frontaoEsp, f, PADRAO.frontaoEsp, b.profundidade, z, z + PADRAO.frontaoAlt, pedra, pd)); else s.push(naParede(b.parede, f - e, f, 0, b.profundidade - e, z - saiaDe(a), z - e, pedra, pd));
     for (const c of b.cubas) if (r.torneira.startsWith("Mesa")) {
       const alta = /alta|monocomando/i.test(r.torneira), th = alta ? 0.26 : 0.12, d = (meio - cp / 2 + PADRAO.frontaoEsp) / 2 + 0.01;
       s.push(naParede(b.parede, b.inicio + c - 0.015, b.inicio + c + 0.015, d - 0.015, d + 0.015, z, z + th, metal), naParede(b.parede, b.inicio + c - 0.012, b.inicio + c + 0.012, d, d + 0.13, z + th - 0.025, z + th, metal));
     }
     if (r.espelho === "sim") { s.push(naParede(b.parede, b.inicio, f, 0, 0.012, ALTURA.espelhoDe, ALTURA.espelhoAte, [190, 212, 228])); alvos.push(["Espelho de 1,15 a 2,10 m", P3(b.parede, b.inicio + b.comprimento / 2, 0.012, 1.7)]); }
-    alvos.push([`${r.pedra || "Pedra"}: tampo 2 cm, saia 20 cm e frontão 10 cm`, P3(b.parede, b.inicio + b.comprimento * 0.2, b.profundidade * 0.8, z)]);
+    alvos.push([`${r.pedra || "Pedra"}: tampo 2 cm, saia ${Math.round(saiaDe(a) * 100)} cm e frontão 10 cm`, P3(b.parede, b.inicio + b.comprimento * 0.2, b.profundidade * 0.8, z)]);
     if (b.cubas.length) alvos.push([`Cuba ${(r.cubaTipo || "").toLowerCase()} e torneira ${(r.torneira || "").toLowerCase()}`, P3(b.parede, b.inicio + b.cubas[0], meio, rec ? z - 0.13 : z + 0.13)]);
   });
   barras.forEach((b) => {
@@ -514,10 +515,11 @@ export async function gerarExecutivo(empresa: Empresa, a: Ambiente, r: Respostas
     `Medidas em metros, lidas da planta${r.origemPlanta ? ` "${r.origemPlanta}"` : ""}. Conferir todas as medidas no local antes de executar.`,
     "Alturas dos pontos a partir do piso acabado. Forro de gesso e pé-direito de 3,00 m.",
     r.revestimentosDefinidos === "sim" ? `Revestimentos: piso ${r.revestimentoPiso || "a definir"}; parede ${r.revestimentoParede || "a definir"}; porta ${r.corPorta || "a definir"}; pintura ${r.pintura || "a definir"}.` : "Revestimentos de piso e parede, cor das portas e pintura: A DEFINIR (representação genérica em tons neutros).",
-    "Bancadas: tampo 2 cm; frontão 2 cm x 10 cm nos lados encostados; saia de 20 cm (fecha em 0,65 m); lateral aberta sem frontão e com saia; cantos em meia esquadria.",
+    `Bancadas: tampo 2 cm; frontão 2 cm x 10 cm nos lados encostados; saia de ${Math.round(saiaDe(a) * 100)} cm (topo do tampo a ${metros(alturaTampoDe(a))}, saia fecha em ${metros(alturaTampoDe(a) - saiaDe(a))}); lateral aberta sem frontão e com saia; cantos em meia esquadria.`,
     "Fixação das bancadas por grapas (barra de metalon 40x30 mm ou barra Ø40 mm) nas laterais, a 3 a 4 cm da saia, fora de ligações hidráulicas, sifão e recortes (ver pranchas de marmoraria).",
     "Caimento do piso em direção ao ralo e impermeabilização das áreas molhadas conforme projeto e normas aplicáveis.",
-    ...(acess.barras.length ? ["Barras de apoio conforme ABNT NBR 9050:2020, item 7.7.2.2: seção de 30 a 45 mm, afastadas no mínimo 40 mm da parede, resistência mínima de 150 kg. Bacia acessível sem abertura frontal, com altura de 0,43 a 0,45 m sem o assento (máx. 0,46 m com assento). Conferir a posição com o modelo da bacia escolhido."] : []),
+    ...(a.acessivel === "sim" && a.bancadas.length ? ["Sanitário acessível: superfície superior do lavatório a 0,80 m e altura livre inferior de 0,73 m, com saia reduzida para 7 cm (ABNT NBR 9050:2020, itens 7.5 e 7.10.3)."] : []),
+    ...(acess.barras.length ? ["Barras de apoio conforme ABNT NBR 9050:2020, item 7.7.2.2: seção de 30 a 45 mm, a no mínimo 40 mm da parede, resistência mínima de 150 kg. Bacia sem abertura frontal, com 0,43 a 0,45 m de altura sem o assento. Conferir com o modelo da bacia."] : []),
   ]);
   carimbo(pr, empresa, logo, r, `${a.nome} - Executivo`, f1, total);
 

@@ -35,11 +35,17 @@ export function conferirSenha(senha: string, hash: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// MPA_COOKIE=previa: o app é aberto dentro de outra página (janela de prévia em https), então o cookie precisa valer nesse contexto.
+function opcoesCookie() {
+  if (process.env.MPA_COOKIE === "previa") return { sameSite: "none" as const, secure: true, partitioned: true };
+  return { sameSite: "lax" as const, secure: process.env.MPA_HTTPS === "1" };
+}
+
 const assinar = (corpo: string) => createHmac("sha256", segredo()).update(corpo).digest("hex");
 
 export async function criarSessao(usuarioId: string) {
   const corpo = Buffer.from(JSON.stringify({ u: usuarioId, e: Date.now() + DIAS * 864e5 })).toString("base64url");
-  (await cookies()).set(COOKIE, corpo + "." + assinar(corpo), { httpOnly: true, sameSite: "lax", path: "/", maxAge: DIAS * 86400, secure: process.env.NODE_ENV === "production" && process.env.MPA_HTTPS === "1" });
+  (await cookies()).set(COOKIE, corpo + "." + assinar(corpo), { httpOnly: true, path: "/", maxAge: DIAS * 86400, ...opcoesCookie() });
 }
 export async function encerrarSessao() { (await cookies()).delete(COOKIE); }
 
@@ -78,5 +84,5 @@ export async function contexto(): Promise<Contexto> {
 }
 
 export async function definirEmpresa(id: string) {
-  (await cookies()).set(COOKIE_EMPRESA, id, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 365 * 86400 });
+  (await cookies()).set(COOKIE_EMPRESA, id, { httpOnly: true, path: "/", maxAge: 365 * 86400, ...opcoesCookie() });
 }

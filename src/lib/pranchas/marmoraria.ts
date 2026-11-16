@@ -3,7 +3,7 @@
 import type { Empresa } from "../tipos";
 import { dataBR } from "../formato";
 import { imagem } from "../documentos/comum";
-import { COR, Prancha, metros, type Sobreposicao } from "./folha";
+import { COR, Prancha, cm, metros, type Sobreposicao } from "./folha";
 import { renderizar, type Solido, type V3 } from "./iso";
 import { PADRAO, eixoCuba, pecasBancada, temCuba, type DadosBancada } from "./regras-bancada";
 
@@ -63,7 +63,7 @@ function planta(pr: Prancha, d: DadosBancada, x: number, y: number, larg: number
 }
 
 function cena(d: DadosBancada): { solidos: Solido[]; azimute: number; alvos: Record<string, V3> } {
-  const C = d.comprimento!, P = d.profundidade!, H = PADRAO.alturaTampo, e = PADRAO.tampo;
+  const C = d.comprimento!, P = d.profundidade!, H = (d.alturaTampo ?? PADRAO.alturaTampo), e = PADRAO.tampo;
   const pedra = corPedra(d.pedra), parede: V3 = [228, 226, 220], piso: V3 = [214, 208, 198], louca: V3 = [248, 248, 246], metal: V3 = [176, 180, 186];
   // A câmera fica do lado em que não há parede lateral (parede do lado da câmera é omitida, como em corte).
   const cameraDireita = !(d.lateralDireita === "parede" && d.lateralEsquerda !== "parede");
@@ -97,13 +97,13 @@ function cena(d: DadosBancada): { solidos: Solido[]; azimute: number; alvos: Rec
   s.push({ min: [0, P - PADRAO.frontaoEsp, H], max: [C, P, H + PADRAO.frontaoAlt], cor: pedra, pedra: true });
   if (d.lateralEsquerda === "parede") s.push({ min: [0, 0, H], max: [PADRAO.frontaoEsp, P - PADRAO.frontaoEsp, H + PADRAO.frontaoAlt], cor: pedra, pedra: true });
   if (d.lateralDireita === "parede") s.push({ min: [C - PADRAO.frontaoEsp, 0, H], max: [C, P - PADRAO.frontaoEsp, H + PADRAO.frontaoAlt], cor: pedra, pedra: true });
-  s.push({ min: [0, 0, H - PADRAO.saia], max: [C, e, H - e], cor: pedra, pedra: true });
-  if (d.lateralEsquerda === "aberta") s.push({ min: [0, e, H - PADRAO.saia], max: [e, P, H - e], cor: pedra, pedra: true });
-  if (d.lateralDireita === "aberta") s.push({ min: [C - e, e, H - PADRAO.saia], max: [C, P, H - e], cor: pedra, pedra: true });
+  s.push({ min: [0, 0, H - (d.saia ?? PADRAO.saia)], max: [C, e, H - e], cor: pedra, pedra: true });
+  if (d.lateralEsquerda === "aberta") s.push({ min: [0, e, H - (d.saia ?? PADRAO.saia)], max: [e, P, H - e], cor: pedra, pedra: true });
+  if (d.lateralDireita === "aberta") s.push({ min: [C - e, e, H - (d.saia ?? PADRAO.saia)], max: [C, P, H - e], cor: pedra, pedra: true });
   const alvos: Record<string, V3> = {
     "Frontão 10 cm": [C * (cameraDireita ? 0.82 : 0.18), P - 0.01, H + PADRAO.frontaoAlt],
     "Tampo 2 cm": [C * (cameraDireita ? 0.9 : 0.1), P * 0.35, H],
-    "Saia 20 cm": [C * (cameraDireita ? 0.8 : 0.2), 0, H - 0.12],
+    [`Saia ${cm(d.saia ?? PADRAO.saia)}`]: [C * (cameraDireita ? 0.8 : 0.2), 0, H - 0.12],
   };
   if (temCuba(d)) alvos[`Cuba ${d.cubaTipo.toLowerCase()}`] = [cx, cy, recorte ? H - 0.13 : H + 0.05];
   if (d.torneira.startsWith("Mesa") || d.torneira === "Parede") {
@@ -150,18 +150,18 @@ export async function gerarPranchaMarmoraria(empresa: Empresa, d: DadosBancada, 
 
   // ---- Vista frontal ----
   tituloBloco(pr, "Vista frontal", 10, 101);
-  const sv = Math.min(g.s, 30), H = PADRAO.alturaTampo;
-  const yPiso = 147, yTopo = yPiso - H * sv, yFr = yTopo - PADRAO.frontaoAlt * sv, ySaia = yTopo + PADRAO.saia * sv;
+  const sv = Math.min(g.s, 30), H = (d.alturaTampo ?? PADRAO.alturaTampo);
+  const yPiso = 147, yTopo = yPiso - H * sv, yFr = yTopo - PADRAO.frontaoAlt * sv, ySaia = yTopo + (d.saia ?? PADRAO.saia) * sv;
   const fx0 = g.x0, fxF = g.x0 + C * g.s;
   pr.linha(fx0 - 8, yPiso, fxF + 8, yPiso, { esp: 0.4 });
   if (d.lateralEsquerda === "parede") pr.ret(fx0 - g.par, yFr - 3, g.par, yPiso - yFr + 3, { fundo: COR.parede });
   if (d.lateralDireita === "parede") pr.ret(fxF, yFr - 3, g.par, yPiso - yFr + 3, { fundo: COR.parede });
   pr.ret(fx0, yFr, C * g.s, PADRAO.frontaoAlt * sv, { fundo: COR.bege, cor: COR.preto, esp: 0.3 });
-  pr.ret(fx0, yTopo, C * g.s, PADRAO.saia * sv, { fundo: pedra, cor: COR.preto, esp: 0.35 });
+  pr.ret(fx0, yTopo, C * g.s, (d.saia ?? PADRAO.saia) * sv, { fundo: pedra, cor: COR.preto, esp: 0.35 });
   pr.linha(g.cx, yFr - 1.5, g.cx, ySaia + 2, { cor: COR.cinza, esp: 0.12, traco: [2, 0.7] });
   const xd = fxF + (d.lateralDireita === "parede" ? g.par : 0), xe = fx0 - (d.lateralEsquerda === "parede" ? g.par : 0);
   pr.cotaV(yFr, yTopo, xd, xd + 5, `frontão ${metros(PADRAO.frontaoAlt)}`);
-  pr.cotaV(yTopo, ySaia, xd, xd + 5, `saia ${metros(PADRAO.saia)}`);
+  pr.cotaV(yTopo, ySaia, xd, xd + 5, `saia ${metros((d.saia ?? PADRAO.saia))}`);
   pr.cotaV(yTopo, yPiso, xe, xe - 6, metros(H), { lado: "esq" });
 
   // ---- Corte A ----
@@ -171,17 +171,17 @@ export async function gerarPranchaMarmoraria(empresa: Empresa, d: DadosBancada, 
   pr.ret(wx - 5, cy0 - 14, 5, 24, { fundo: COR.parede }); pr.hachura(wx - 5, cy0 - 14, 5, 24, 1.4, "#8A8A8A");
   pr.ret(wx, cy0 - PADRAO.frontaoAlt * sc, e, PADRAO.frontaoAlt * sc, { fundo: pedra, cor: COR.preto, esp: 0.3 });
   pr.ret(wx, cy0, P * sc, e, { fundo: pedra, cor: COR.preto, esp: 0.3 });
-  pr.ret(cxF - e, cy0 + e, e, PADRAO.saia * sc - e, { fundo: pedra, cor: COR.preto, esp: 0.3 });
+  pr.ret(cxF - e, cy0 + e, e, (d.saia ?? PADRAO.saia) * sc - e, { fundo: pedra, cor: COR.preto, esp: 0.3 });
   const gy = cy0 + e, gx2 = cxF - e - PADRAO.grapaFolgaSaia * sc;
   pr.ret(wx - PADRAO.grapaEmbutida * sc, gy, gx2 - (wx - PADRAO.grapaEmbutida * sc), 0.03 * sc, { fundo: COR.dourado, cor: COR.preto, esp: 0.2 });
   const chamadas: [number, number, string][] = [
     [wx + e / 2, cy0 - PADRAO.frontaoAlt * sc * 0.6, "Frontão 2 x 10 cm"],
     [wx + P * sc * 0.72, cy0 + e / 2, "Tampo 2 cm"],
     [wx + P * sc * 0.45, gy + 0.015 * sc, "Grapa: metalon 40x30 mm ou barra Ø40 mm"],
-    [cxF - e / 2, cy0 + PADRAO.saia * sc * 0.7, "Saia 20 cm"],
+    [cxF - e / 2, cy0 + (d.saia ?? PADRAO.saia) * sc * 0.7, `Saia ${cm(d.saia ?? PADRAO.saia)}`],
   ];
   chamadas.forEach(([ax, ay, rot], i) => pr.chamada(ax, ay, cxF + 9, cy0 - 9 + i * 4.6, rot));
-  pr.cotaH(wx, cxF, cy0 + PADRAO.saia * sc, cy0 + PADRAO.saia * sc + 3.5, metros(P));
+  pr.cotaH(wx, cxF, cy0 + (d.saia ?? PADRAO.saia) * sc, cy0 + (d.saia ?? PADRAO.saia) * sc + 3.5, metros(P));
 
   // ---- Perspectiva ----
   tituloBloco(pr, "Perspectiva isométrica (ilustrativa)", 156, 27);
@@ -196,12 +196,12 @@ export async function gerarPranchaMarmoraria(empresa: Empresa, d: DadosBancada, 
   tituloBloco(pr, "Notas", 156, 119);
   const notas = [
     `Pedra: ${d.pedra}. Cor da perspectiva meramente ilustrativa.`,
-    "Tampo com 2 cm; frontão com 2 cm de espessura e 10 cm de altura; saia de 20 cm. Cantos em meia esquadria.",
+    `Tampo com 2 cm; frontão com 2 cm de espessura e 10 cm de altura; saia de ${cm(d.saia ?? PADRAO.saia)}. Cantos em meia esquadria.` + (d.saia ? " Sanitário acessível: topo do tampo a 0,80 m e 0,73 m livres embaixo (ABNT NBR 9050:2020, itens 7.5 e 7.10.3)." : ""),
     [d.lateralEsquerda === "aberta" ? "Lateral esquerda aberta: sem frontão, com saia." : "Lateral esquerda encostada na parede: com frontão.", d.lateralDireita === "aberta" ? "Lateral direita aberta: sem frontão, com saia." : "Lateral direita encostada na parede: com frontão."].join(" "),
     temCuba(d) ? `Cuba ${d.cubaTipo.toLowerCase()} de ${metros(d.cubaLargura!)} x ${metros(d.cubaProfundidade!)}, com o eixo a ${metros(eixoCuba(d))} da ponta esquerda.` + (d.cubaTipo === "Esculpida" ? " Fundo fixo, válvula click centralizada e faixa de escoamento de 1 cm." : " Conferir o recorte com o modelo da cuba.") : "Bancada sem cuba.",
     `Torneira: ${d.torneira.toLowerCase()}. Conferir a furação com o modelo.`,
     d.revestimentosDefinidos === "sim" ? `Revestimentos: piso ${d.revestimentoPiso || "a definir"}; parede ${d.revestimentoParede || "a definir"}; porta ${d.corPorta || "a definir"}; pintura ${d.pintura || "a definir"}.` : "Revestimentos, cor da porta e pintura: a definir.",
-    `Suposições: topo do tampo a ${metros(PADRAO.alturaTampo)} do piso acabado; cuba centralizada na profundidade útil do tampo; profundidade do bojo da cuba conforme o modelo.`,
+    `Suposições: topo do tampo a ${metros((d.alturaTampo ?? PADRAO.alturaTampo))} do piso acabado; cuba centralizada na profundidade útil do tampo; profundidade do bojo da cuba conforme o modelo.`,
     ...(d.observacoes.trim() ? [d.observacoes.trim()] : []),
   ];
   let yn = 123;
@@ -247,13 +247,13 @@ export async function gerarPranchaMarmoraria(empresa: Empresa, d: DadosBancada, 
     // ---- Detalhe ampliado da fixação (corte) ----
     tituloBloco(pr, "Detalhe da fixação (corte ampliado)", 10, 124);
     const sd = Math.min(95 / P, 150), dy = 152, dw = 30, e2 = Math.max(PADRAO.tampo * sd, 1.6), dF = dw + P * sd;
-    pr.ret(dw - 14, dy - PADRAO.frontaoAlt * sd - 4, 14, PADRAO.frontaoAlt * sd + PADRAO.saia * sd + 8, { fundo: COR.parede }); pr.hachura(dw - 14, dy - PADRAO.frontaoAlt * sd - 4, 14, PADRAO.frontaoAlt * sd + PADRAO.saia * sd + 8, 1.6, "#8A8A8A");
+    pr.ret(dw - 14, dy - PADRAO.frontaoAlt * sd - 4, 14, PADRAO.frontaoAlt * sd + (d.saia ?? PADRAO.saia) * sd + 8, { fundo: COR.parede }); pr.hachura(dw - 14, dy - PADRAO.frontaoAlt * sd - 4, 14, PADRAO.frontaoAlt * sd + (d.saia ?? PADRAO.saia) * sd + 8, 1.6, "#8A8A8A");
     pr.ret(dw, dy - PADRAO.frontaoAlt * sd, e2, PADRAO.frontaoAlt * sd, { fundo: pedra, cor: COR.preto, esp: 0.3 });
     pr.ret(dw, dy, P * sd, e2, { fundo: pedra, cor: COR.preto, esp: 0.3 });
-    pr.ret(dF - e2, dy + e2, e2, PADRAO.saia * sd - e2, { fundo: pedra, cor: COR.preto, esp: 0.3 });
+    pr.ret(dF - e2, dy + e2, e2, (d.saia ?? PADRAO.saia) * sd - e2, { fundo: pedra, cor: COR.preto, esp: 0.3 });
     const g1 = dw - PADRAO.grapaEmbutida * sd, g2 = dF - e2 - PADRAO.grapaFolgaSaia * sd, gh = 0.03 * sd;
     pr.ret(g1, dy + e2, g2 - g1, gh, { fundo: COR.dourado, cor: COR.preto, esp: 0.25 });
-    const yc = dy + PADRAO.saia * sd + 5;
+    const yc = dy + (d.saia ?? PADRAO.saia) * sd + 5;
     pr.cotaH(g1, dw, dy + e2 + gh, yc, "0,08 m", { estreita: "abaixo" });
     pr.cotaH(g2, dF - e2, dy + e2 + gh, yc, "0,03 a 0,04 m", { estreita: "abaixo" });
     pr.chamadaVertical((dw + g2) / 2, dy + e2 + gh / 2, dy - PADRAO.frontaoAlt * sd - 2, "Grapa: metalon 40x30 mm ou barra Ø40 mm, sob o tampo", { lado: "dir" });
