@@ -45,7 +45,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
         {cartoes.map((c) => (
           <div key={c.rotulo} className="cartao"><p className={"text-3xl font-bold " + c.cor}>{c.n}</p><p className="text-xs font-semibold uppercase tracking-wide text-cinza">{c.rotulo}</p></div>
         ))}
-        <div className="cartao col-span-2 flex items-center justify-between bg-bege/40"><p className="text-xs font-semibold uppercase tracking-wide text-cinza">Detalhamentos (marmoraria, áreas molhadas, marcenaria)</p><EmBreve fase={2} /></div>
+        <div className="cartao col-span-2 flex items-center justify-between bg-bege/40"><p className="text-xs font-semibold uppercase tracking-wide text-cinza">Detalhamentos: marmoraria pronta (aba do projeto). Áreas molhadas e marcenaria em construção</p><EmBreve fase={2} /></div>
         <div className="cartao col-span-2 flex items-center justify-between bg-bege/40"><p className="text-xs font-semibold uppercase tracking-wide text-cinza">Obras em andamento e contas da semana</p><EmBreve fase={3} /></div>
       </section>
 

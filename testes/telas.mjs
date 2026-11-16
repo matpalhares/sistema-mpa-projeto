@@ -66,6 +66,26 @@ await pg.click("button:has-text('Gerar memorial (DOCX + PDF)')"); await pg.waitF
 conferir("memorial gerado nos dois tipos", (await pg.locator("a:has-text('Abrir PDF')").count()) === 2);
 await foto("6-memorial-gerado");
 
+console.log("T09  Marmoraria");
+await pg.goto(urlProjeto + "?aba=detalhamentos"); await pg.click("button:has-text('Detalhar bancada')"); await pg.waitForURL(/detalhamentos\//);
+conferir("sem respostas, o botão Gerar fica bloqueado", await pg.locator("button:has-text('Gerar prancha (PDF)')").isDisabled());
+conferir("lista as perguntas obrigatórias (pedra, cuba, torneira)", await pg.locator("li:has-text('Qual pedra será usada?')").isVisible() && await pg.locator("li:has-text('Qual o tipo de cuba?')").isVisible() && await pg.locator("li:has-text('Qual o tipo de torneira?')").isVisible());
+await pg.click("button:has-text('Lavabo')");
+await pg.fill("label:has-text('Comprimento') input", "1,20"); await pg.fill("label:has-text('Profundidade (m)') input", "0,50");
+await pg.locator("button:has-text('Encosta na parede')").first().click(); await pg.locator("button:has-text('Aberta ao ambiente')").nth(1).click();
+await pg.click("button:has-text('Granito Bege Bahia')"); await pg.click("button:has-text('Esculpida')");
+await pg.fill("label:has-text('Cuba: largura') input", "0,50"); await pg.fill("label:has-text('Cuba: profundidade') input", "0,30");
+await pg.click("button:has-text('Centralizada no comprimento')"); await pg.click("button:has-text('Mesa, bica baixa')"); await pg.click("button:has-text('Ainda não')");
+conferir("recomenda a opção B para bancada acima de 1,00 m", await pg.locator("button:has-text('Opção B: 4 barras (Recomendado)')").isVisible());
+await pg.click("button:has-text('Opção B')");
+conferir("sem conferir as medidas, continua bloqueado", await pg.locator("button:has-text('Gerar prancha (PDF)')").isDisabled());
+await pg.check("input[type=checkbox]");
+await foto("10-marmoraria");
+await pg.click("button:has-text('Gerar prancha (PDF)')"); await pg.waitForSelector("text=Prancha gerada", { timeout: 120000 });
+conferir("prancha gerada sem sobreposições", await pg.locator("text=Nenhum texto ou cota sobreposto").isVisible());
+const rp = await pg.request.get(base + (await pg.locator("a:has-text('Abrir PDF')").getAttribute("href")));
+conferir("PDF da prancha abre pelo link", rp.status() === 200 && (await rp.body()).subarray(0, 4).toString() === "%PDF");
+
 console.log("Empresas e isolamento");
 await pg.goto(base); await foto("7-painel");
 conferir("Painel mostra o projeto e pendências", await pg.locator("text=Residência de Teste").first().isVisible() && await pg.locator("h2:has-text('Falta preencher')").isVisible());

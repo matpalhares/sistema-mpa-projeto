@@ -27,6 +27,7 @@ export interface Marca {
   assinaturaNome?: string; // ex.: Matheus Palhares
   assinaturaTitulo?: string; // ex.: Arquiteto e Urbanista
   logoBranco?: string;
+  logoPrancha?: string; // logo compacto para o cabeçalho das pranchas
 }
 
 export interface Empresa {
@@ -217,6 +218,22 @@ export interface Memorial {
   revisao: number;
   dados: DadosMemorial;
   saidas: Partial<Record<TipoMemorial, { docx: string; pdf: string | null; verificacao: Verificacao }>>;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface VerificacaoPrancha { folhas: number; sobreposicoes: number; avisos: string[] }
+
+// Detalhamento técnico (Fase 2). Por enquanto: marmoraria (bancada, padrão A).
+export interface Detalhamento {
+  id: Id;
+  empresaId: Id;
+  projetoId: Id;
+  tipo: "marmoraria";
+  dados: import("./pranchas/regras-bancada").DadosBancada;
+  plantaSituacao: string | null; // imagem da planta (PNG ou JPG) para a folha 2
+  pdf: string | null;
+  verificacao: VerificacaoPrancha | null;
   criadoEm: string;
   atualizadoEm: string;
 }

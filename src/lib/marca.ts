@@ -27,6 +27,7 @@ export const MARCA_MPA: Marca = {
   assinaturaNome: "Matheus Palhares",
   assinaturaTitulo: "Arquiteto e Urbanista",
   logoBranco: "recursos/marca/mpa_logo_branco.png",
+  logoPrancha: "recursos/marca/mpa_logo_prancha.png",
 };
 
 // LM, Matelli e MPX têm identidade própria que ainda não foi enviada: ficam "a definir".

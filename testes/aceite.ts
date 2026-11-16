@@ -79,6 +79,40 @@ async function imagensPorPagina(pdf: Buffer): Promise<{ imagens: number[]; texto
   conferir("bloqueia medida digitada no tipo (simplificado)", errosMemorial(comMedida, "simplificado").length > 0);
   conferir("bloqueia se a lista de ambientes não foi conferida", errosMemorial({ ...dadosTeste(), leituraConfirmada: false }, "completo").length > 0);
 
+  console.log("T09  Marmoraria: perguntar antes de gerar");
+  const { gerarMarmoraria } = await import("../src/lib/servicos");
+  const { bancadaInicial, perguntasEmAberto, pecasBancada } = await import("../src/lib/pranchas/regras-bancada");
+  const { CASOS } = await import("./exemplo-marmoraria");
+  const novoDet = (dados: unknown) => salvar("detalhamentos", { empresaId: "mpa", projetoId: "x", tipo: "marmoraria", dados, plantaSituacao: null, pdf: null, verificacao: null } as never);
+  const semRespostas = await novoDet(bancadaInicial({ ambiente: "BWC", comprimento: 1.2, profundidade: 0.5, lateralEsquerda: "parede", lateralDireita: "aberta", grapas: "A", revestimentosDefinidos: "nao", medidasConfirmadas: true }));
+  const r9 = await gerarMarmoraria(mpa, semRespostas.id);
+  const perguntas = r9.ok ? "" : r9.erros.join(" | ");
+  conferir("sem pedra, cuba e torneira: não gera", !r9.ok);
+  conferir("pergunta a pedra", perguntas.includes("Qual pedra será usada?"));
+  conferir("pergunta o tipo de cuba", perguntas.includes("Qual o tipo de cuba?"));
+  conferir("pergunta a torneira", perguntas.includes("Qual o tipo de torneira?"));
+  conferir("com cuba escolhida, pergunta as medidas dela", perguntasEmAberto(bancadaInicial({ cubaTipo: "Esculpida" })).some((x) => x.includes("medidas da cuba")));
+  conferir("pergunta os revestimentos", perguntasEmAberto(bancadaInicial()).some((x) => x.includes("revestimentos")));
+  for (const [nome, dados] of Object.entries(CASOS)) {
+    const dt = await novoDet(dados);
+    const g = await gerarMarmoraria(mpa, dt.id);
+    const v = g.ok ? g.dados!.verificacao! : null;
+    conferir(`prancha "${nome}": 2 folhas, sem sobreposição de texto ou cota`, !!v && v.folhas === 2 && v.sobreposicoes === 0, v ? `${v.sobreposicoes} sobreposições` : (g.ok ? "" : g.erros.join("; ")));
+    if (nome === "bwc" && g.ok) {
+      const { texto } = await imagensPorPagina((await lerArquivo(g.dados!.pdf!))!);
+      const t1 = texto.join(" ");
+      conferir("padrões fixos na prancha (tampo 2 cm, frontão 2 x 10 cm, saia 20 cm)", t1.includes("Tampo 2 cm") && t1.includes("Frontão 2 x 10 cm") && t1.includes("Saia 20 cm"));
+      conferir("cuba esculpida: fundo fixo e válvula click centralizada", /Fundo fixo, válvula click centralizada/.test(t1));
+      conferir("grapas: metalon 40x30 mm ou barra Ø40 mm", t1.includes("metalon 40x30 mm ou barra Ø40 mm"));
+      conferir("folhas numeradas sozinhas (01/02 e 02/02)", t1.includes("FOLHA 01/02") && t1.includes("FOLHA 02/02"));
+      conferir("aviso de conferir medidas no local", t1.includes("CONFERIR MEDIDAS NO LOCAL"));
+    }
+  }
+  const pb = pecasBancada(CASOS.bwc);
+  conferir("lateral aberta: sem frontão lateral daquele lado, com saia lateral", pb.find((x) => x.nome === "Frontão lateral")?.qtd === 1 && pb.find((x) => x.nome === "Saia lateral")?.qtd === 1);
+  conferir("bloqueia cuba que não cabe na bancada", !(await gerarMarmoraria(mpa, (await novoDet({ ...CASOS.bwc, cubaLargura: 1.3 })).id)).ok);
+  conferir("bloqueia sem a conferência das medidas", !(await gerarMarmoraria(mpa, (await novoDet({ ...CASOS.bwc, medidasConfirmadas: false })).id)).ok);
+
   console.log(falhas ? `\n${falhas} FALHA(S)` : "\nTodos os testes passaram.");
   process.exit(falhas ? 1 : 0);
 })();

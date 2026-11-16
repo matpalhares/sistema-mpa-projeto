@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { arquivarProjeto, atualizarProjeto, definirEtapa, excluirArquivo, novaProposta, novoMemorial, statusProposta } from "../../../acoes";
+import { arquivarProjeto, atualizarProjeto, definirEtapa, excluirArquivo, novaProposta, novoDetalhamento, novoMemorial, statusProposta } from "../../../acoes";
 import { BarraEtapas } from "@/componentes/BarraEtapas";
 import { CamposProjeto } from "@/componentes/CamposProjeto";
 import { EnvioArquivo } from "@/componentes/EnvioArquivo";
@@ -10,7 +10,7 @@ import { listar, obter } from "@/lib/banco";
 import { dataBR, moeda } from "@/lib/formato";
 import { pendenciasProjeto } from "@/lib/pendencias";
 import { contexto } from "@/lib/sessao";
-import type { Cliente, Memorial, Projeto, Proposta } from "@/lib/tipos";
+import type { Cliente, Detalhamento, Memorial, Projeto, Proposta } from "@/lib/tipos";
 
 const CATEGORIA = { planta: "Planta baixa", sketchup: "SketchUp", contrato: "Contrato", outro: "Outro" };
 const COR_STATUS: Record<string, string> = { rascunho: "bg-bege text-cinza", enviada: "bg-[#DDEBF7] text-azul", aprovada: "bg-verde/15 text-verde", recusada: "bg-vermelho/10 text-vermelho" };
@@ -21,15 +21,16 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
   const { aba = "visao" } = await searchParams;
   const p = await obter<Projeto>("projetos", id, empresa.id);
   if (!p) notFound();
-  const [c, propostas, memoriais] = await Promise.all([
+  const [c, propostas, memoriais, detalhamentos] = await Promise.all([
     obter<Cliente>("clientes", p.clienteId, empresa.id),
     listar<Proposta>("propostas", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
     listar<Memorial>("memoriais", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
+    listar<Detalhamento>("detalhamentos", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
   ]);
   const pend = pendenciasProjeto(p, c);
   // Regra T10: Orçamento de obra e Cronograma só existem se o cliente contratou a execução.
   const abas = [
-    ["visao", "Visão geral"], ["dados", "Dados"], ["propostas", `Propostas (${propostas.length})`], ["memorial", `Memorial (${memoriais.length})`], ["arquivos", `Arquivos (${p.arquivos.length})`],
+    ["visao", "Visão geral"], ["dados", "Dados"], ["propostas", `Propostas (${propostas.length})`], ["memorial", `Memorial (${memoriais.length})`], ["detalhamentos", `Detalhamentos (${detalhamentos.length})`], ["arquivos", `Arquivos (${p.arquivos.length})`],
     ...(p.contratouExecucao === true ? [["orcamento", "Orçamento de obra"], ["cronograma", "Cronograma"]] : []),
   ];
   return (
@@ -68,7 +69,7 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
             </section>
             <section className="cartao space-y-3 text-sm">
               <h2 className="titulo text-sm">O que vem nas próximas fases</h2>
-              <p className="flex items-center justify-between">Marmoraria e áreas molhadas <EmBreve fase={2} /></p>
+              <p className="flex items-center justify-between">Executivo de áreas molhadas (padrão B) <EmBreve fase={2} /></p>
               <p className="flex items-center justify-between">Marcenaria a partir do SketchUp <EmBreve fase={2} /></p>
               <p className="flex items-center justify-between">Cronograma, relatório, comparativo, financeiro e recibos <EmBreve fase={3} /></p>
               {p.contratouExecucao !== true && <p className="rounded-lg bg-bege/60 p-2 text-xs text-cinza">As abas Orçamento de obra e Cronograma estão ocultas porque {p.contratouExecucao === false ? "o cliente não contratou a execução" : "ainda não foi informado se o cliente contratou a execução"}.</p>}
@@ -121,6 +122,27 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
                 </span>
               ))}
               <Link href={`/memoriais/${m.id}`} className="botao">Abrir</Link>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {aba === "detalhamentos" && (
+        <section className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <form action={novoDetalhamento} className="cartao"><input type="hidden" name="projetoId" value={p.id} />
+              <p className="font-semibold text-azul">Marmoraria: bancada</p>
+              <p className="mb-3 text-xs text-cinza">Prancha A4 para a marmoraria: vista superior cotada, vista frontal, corte, perspectiva, fixação e lista de peças.</p>
+              <button className="botao w-full">Detalhar bancada</button>
+            </form>
+            <div className="cartao bg-bege/40"><p className="flex items-center justify-between font-semibold text-azul">Executivo de áreas molhadas <EmBreve fase={2} /></p><p className="text-xs text-cinza">Prancha A3 com planta, vistas internas, quadro de pontos e perspectiva do ambiente. Em construção.</p></div>
+            <div className="cartao bg-bege/40"><p className="flex items-center justify-between font-semibold text-azul">Marcenaria <EmBreve fase={2} /></p><p className="text-xs text-cinza">A partir do SketchUp, com o plugin exportador. Em construção.</p></div>
+          </div>
+          {detalhamentos.map((dt) => (
+            <div key={dt.id} className="cartao flex flex-wrap items-center gap-3">
+              <div className="grow"><p className="font-semibold text-azul">Marmoraria · {dt.dados.nomePrancha || dt.dados.ambiente || "bancada sem nome"}</p><p className="text-xs text-cinza">{dt.dados.pedra || "pedra a responder"} · atualizado em {dataBR(dt.atualizadoEm)}</p></div>
+              {dt.pdf && <a className="botao-leve" href={`/api/arquivo?c=${encodeURIComponent(dt.pdf)}&ver=1`} target="_blank">PDF</a>}
+              <Link href={`/detalhamentos/${dt.id}`} className="botao">Abrir</Link>
             </div>
           ))}
         </section>

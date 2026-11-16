@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfjs-dist", "docx", "sharp"],
+  serverExternalPackages: ["pdfjs-dist", "docx", "sharp", "pdfkit"],
   outputFileTracingIncludes: { "/**": ["./recursos/**"] },
   turbopack: {
     rules: {

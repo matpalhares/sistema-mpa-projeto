@@ -1,6 +1,6 @@
 # Sistema MPA Projeto
 
-Projetos, propostas e memoriais do escritório. Esta é a **Fase 1** (base e documentos).
+Projetos, propostas, memoriais e detalhamentos do escritório. Fase 1 concluída (base e documentos); Fase 2 em andamento (detalhamentos).
 
 ## O que já funciona
 
@@ -8,8 +8,9 @@ Projetos, propostas e memoriais do escritório. Esta é a **Fase 1** (base e doc
 - Painel em cards, com busca de projetos e a lista "Falta preencher".
 - Projetos com as 13 etapas, arquivos (planta, SketchUp, contrato) e a regra da execução:
   as abas Orçamento de obra e Cronograma só aparecem se o cliente contratou a execução.
-- Proposta comercial em DOCX e PDF, com revisão automática de paginação.
+- Proposta comercial em DOCX e PDF no modelo visual aprovado (Proposta Cris Bebidas), com revisão automática de paginação.
 - Memorial descritivo completo e simplificado (prefeitura), em DOCX e PDF.
+- Marmoraria (Fase 2): prancha A4 da bancada com vista superior cotada, vista frontal, corte, perspectiva, fixação e lista de peças. O sistema só gera depois de responder pedra, cuba, torneira e medidas, e confere sozinho se algum texto ou cota ficou sobreposto.
 
 ## Como abrir no seu computador
 
@@ -52,10 +53,10 @@ Os dados da pasta `dados` não migram sozinhos para o Supabase.
 
 ## Testes
 
-- `npm run teste`: testes de aceite dos documentos (T07 proposta, T08 memorial simplificado).
+- `npm run teste`: testes de aceite dos documentos (T07 proposta, T08 memorial simplificado, T09 marmoraria).
 - `node testes/telas.mjs http://localhost:3000`: teste das telas pelo navegador, incluindo o T10. Use em uma instalação vazia (ele cria o primeiro usuário) e precisa do Playwright instalado.
 
-## Próximas fases
+## Próximas entregas
 
-- **Fase 2:** detalhamentos (marmoraria e áreas molhadas, depois marcenaria com o plugin do SketchUp).
+- **Fase 2 (em andamento):** executivo de áreas molhadas (padrão B, A3) e marcenaria com o plugin do SketchUp.
 - **Fase 3:** gestão da obra (cronograma, relatório fotográfico, comparativo, financeiro e recibos).

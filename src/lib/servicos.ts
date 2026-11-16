@@ -1,7 +1,10 @@
 // Regras de negócio usadas pelas ações e pelos testes (sem depender de cookies).
 import { obter, salvar } from "./banco";
 import { salvarArquivo, nomeSeguro } from "./arquivos";
-import type { Empresa, Memorial, Proposta, TipoMemorial } from "./tipos";
+import type { Detalhamento, Empresa, Memorial, Proposta, TipoMemorial } from "./tipos";
+import { lerArquivo } from "./arquivos";
+import { gerarPranchaMarmoraria } from "./pranchas/marmoraria";
+import { errosBancada, perguntasEmAberto } from "./pranchas/regras-bancada";
 import { faltaNaMarca } from "./marca";
 import { converterParaPdf, verificar } from "./documentos/comum";
 import { errosProposta, gerarPropostaDocx } from "./documentos/proposta";
@@ -47,5 +50,21 @@ export async function gerarMemorial(empresa: Empresa, memorialId: string, tipos:
     saidas[tipo] = { docx: base + ".docx", pdf: pdf ? base + ".pdf" : null, verificacao };
   }
   const novo = await salvar<Memorial>("memoriais", { ...me, saidas });
+  return { ok: true, dados: novo };
+}
+
+// Marmoraria (P05, padrão A). Teste T09: enquanto houver pergunta obrigatória sem resposta, não gera.
+export async function gerarMarmoraria(empresa: Empresa, id: string): Promise<Resultado<Detalhamento>> {
+  const det = await obter<Detalhamento>("detalhamentos", id, empresa.id);
+  if (!det) return { ok: false, erros: ["Detalhamento não encontrado."] };
+  const abertas = perguntasEmAberto(det.dados);
+  if (abertas.length) return { ok: false, erros: abertas.map((p) => "Responda antes de gerar: " + p) };
+  const erros = [...marcaPronta(empresa), ...errosBancada(det.dados)];
+  if (erros.length) return { ok: false, erros };
+  const situacao = det.plantaSituacao && /\.(png|jpe?g)$/i.test(det.plantaSituacao) ? await lerArquivo(det.plantaSituacao) : null;
+  const r = await gerarPranchaMarmoraria(empresa, det.dados, situacao);
+  const caminho = `${empresa.id}/detalhamentos/${det.id}/Marmoraria_${nomeSeguro(det.dados.nomePrancha || det.dados.ambiente)}_R${String(det.dados.revisao).padStart(2, "0")}.pdf`;
+  await salvarArquivo(caminho, r.pdf, "application/pdf");
+  const novo = await salvar<Detalhamento>("detalhamentos", { ...det, pdf: caminho, verificacao: { folhas: r.folhas, sobreposicoes: r.sobreposicoes.length, avisos: r.avisos } });
   return { ok: true, dados: novo };
 }

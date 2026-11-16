@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { listar, obter, salvar } from "@/lib/banco";
 import { lerArquivo, removerArquivo, salvarArquivo, nomeSeguro } from "@/lib/arquivos";
 import { conferirSenha, contexto, criarSessao, definirEmpresa, encerrarSessao, hashSenha, semear } from "@/lib/sessao";
-import type { Cliente, DadosMemorial, DadosProposta, Empresa, Marca, Memorial, Projeto, Proposta, StatusProposta, TipoMemorial, Usuario } from "@/lib/tipos";
+import type { Detalhamento, Cliente, DadosMemorial, DadosProposta, Empresa, Marca, Memorial, Projeto, Proposta, StatusProposta, TipoMemorial, Usuario } from "@/lib/tipos";
 import { propostaInicial } from "@/lib/documentos/textos-proposta";
 import { memorialInicial } from "@/lib/documentos/regras-memorial";
-import { gerarMemorial, gerarProposta, type Resultado } from "@/lib/servicos";
+import { gerarMarmoraria, gerarMemorial, gerarProposta, type Resultado } from "@/lib/servicos";
+import { bancadaInicial, type DadosBancada } from "@/lib/pranchas/regras-bancada";
 import { iaDisponivel, lerPlanta, type LeituraPlanta } from "@/lib/ia";
 import { faltaNaMarca } from "@/lib/marca";
 
@@ -241,6 +242,39 @@ export async function lerPlantaDoProjeto(projetoId: string, caminho: string): Pr
   } catch (e) {
     return { ok: false, erros: ["A leitura automática falhou: " + (e instanceof Error ? e.message : "erro desconhecido") + " Você pode preencher os ambientes à mão."] };
   }
+}
+
+// ---------- DETALHAMENTOS (Fase 2) ----------
+export async function novoDetalhamento(f: FormData) {
+  const { empresa } = await contexto();
+  const p = await obter<Projeto>("projetos", txt(f, "projetoId"), empresa.id);
+  if (!p) redirect("/");
+  const c = await obter<Cliente>("clientes", p.clienteId, empresa.id);
+  const det = await salvar<Detalhamento>("detalhamentos", {
+    empresaId: empresa.id, projetoId: p.id, tipo: "marmoraria", plantaSituacao: null, pdf: null, verificacao: null,
+    dados: bancadaInicial({ cliente: c?.nome ?? "", local: [p.endereco, p.municipio].filter(Boolean).join(", ") }),
+  });
+  redirect(`/detalhamentos/${det.id}`);
+}
+
+export async function salvarDetalhamento(id: string, dados: DadosBancada, plantaSituacao: string | null): Promise<Resultado> {
+  const { empresa } = await contexto();
+  const det = await obter<Detalhamento>("detalhamentos", id, empresa.id);
+  if (!det) return { ok: false, erros: ["Detalhamento não encontrado."] };
+  const p = await obter<Projeto>("projetos", det.projetoId, empresa.id);
+  const planta = plantaSituacao && p?.arquivos.some((a) => a.caminho === plantaSituacao) ? plantaSituacao : null;
+  await salvar<Detalhamento>("detalhamentos", { ...det, dados, plantaSituacao: planta });
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function salvarEGerarDetalhamento(id: string, dados: DadosBancada, plantaSituacao: string | null): Promise<Resultado<Detalhamento>> {
+  const { empresa } = await contexto();
+  const s = await salvarDetalhamento(id, dados, plantaSituacao);
+  if (!s.ok) return s;
+  const r = await gerarMarmoraria(empresa, id);
+  revalidatePath("/", "layout");
+  return r;
 }
 
 void nomeSeguro;
