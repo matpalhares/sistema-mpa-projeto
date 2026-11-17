@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { arquivarProjeto, atualizarProjeto, definirEtapa, excluirArquivo, novaProposta, novoConjuntoMolhadas, novoDetalhamento, novoMemorial, statusProposta } from "../../../acoes";
+import { arquivarProjeto, atualizarProjeto, definirEtapa, excluirArquivo, novaProposta, novaMarcenaria, novoConjuntoMolhadas, novoDetalhamento, novoMemorial, statusProposta } from "../../../acoes";
 import { BarraEtapas } from "@/componentes/BarraEtapas";
 import { CamposProjeto } from "@/componentes/CamposProjeto";
 import { EnvioArquivo } from "@/componentes/EnvioArquivo";
@@ -10,7 +10,7 @@ import { listar, obter } from "@/lib/banco";
 import { dataBR, moeda } from "@/lib/formato";
 import { pendenciasProjeto } from "@/lib/pendencias";
 import { contexto } from "@/lib/sessao";
-import type { Cliente, ConjuntoMolhadas, Detalhamento, Memorial, Projeto, Proposta } from "@/lib/tipos";
+import type { Cliente, ConjuntoMarcenaria, ConjuntoMolhadas, Detalhamento, Memorial, Projeto, Proposta } from "@/lib/tipos";
 
 const CATEGORIA = { planta: "Planta baixa", sketchup: "SketchUp", contrato: "Contrato", outro: "Outro" };
 const COR_STATUS: Record<string, string> = { rascunho: "bg-bege text-cinza", enviada: "bg-[#DDEBF7] text-azul", aprovada: "bg-verde/15 text-verde", recusada: "bg-vermelho/10 text-vermelho" };
@@ -21,17 +21,18 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
   const { aba = "visao" } = await searchParams;
   const p = await obter<Projeto>("projetos", id, empresa.id);
   if (!p) notFound();
-  const [c, propostas, memoriais, detalhamentos, conjuntos] = await Promise.all([
+  const [c, propostas, memoriais, detalhamentos, conjuntos, marcenarias] = await Promise.all([
     obter<Cliente>("clientes", p.clienteId, empresa.id),
     listar<Proposta>("propostas", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
     listar<Memorial>("memoriais", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
     listar<Detalhamento>("detalhamentos", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
     listar<ConjuntoMolhadas>("molhadas", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
+    listar<ConjuntoMarcenaria>("marcenarias", empresa.id).then((l) => l.filter((x) => x.projetoId === p.id)),
   ]);
   const pend = pendenciasProjeto(p, c);
   // Regra T10: Orçamento de obra e Cronograma só existem se o cliente contratou a execução.
   const abas = [
-    ["visao", "Visão geral"], ["dados", "Dados"], ["propostas", `Propostas (${propostas.length})`], ["memorial", `Memorial (${memoriais.length})`], ["detalhamentos", `Detalhamentos (${detalhamentos.length + conjuntos.length})`], ["arquivos", `Arquivos (${p.arquivos.length})`],
+    ["visao", "Visão geral"], ["dados", "Dados"], ["propostas", `Propostas (${propostas.length})`], ["memorial", `Memorial (${memoriais.length})`], ["detalhamentos", `Detalhamentos (${detalhamentos.length + conjuntos.length + marcenarias.length})`], ["arquivos", `Arquivos (${p.arquivos.length})`],
     ...(p.contratouExecucao === true ? [["orcamento", "Orçamento de obra"], ["cronograma", "Cronograma"]] : []),
   ];
   return (
@@ -70,7 +71,6 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
             </section>
             <section className="cartao space-y-3 text-sm">
               <h2 className="titulo text-sm">O que vem nas próximas fases</h2>
-              <p className="flex items-center justify-between">Marcenaria a partir do SketchUp <EmBreve fase={2} /></p>
               <p className="flex items-center justify-between">Cronograma, relatório, comparativo, financeiro e recibos <EmBreve fase={3} /></p>
               {p.contratouExecucao !== true && <p className="rounded-lg bg-bege/60 p-2 text-xs text-cinza">As abas Orçamento de obra e Cronograma estão ocultas porque {p.contratouExecucao === false ? "o cliente não contratou a execução" : "ainda não foi informado se o cliente contratou a execução"}.</p>}
             </section>
@@ -140,8 +140,19 @@ export default async function PaginaProjeto({ params, searchParams }: { params: 
               <p className="mb-3 text-xs text-cinza">O sistema lê os banheiros da planta, você confere o desenho e responde as perguntas. Saem o executivo A3 de cada ambiente e a marmoraria de cada bancada.</p>
               <button className="botao-ouro w-full">Detalhar pela planta</button>
             </form>
-            <div className="cartao bg-bege/40"><p className="flex items-center justify-between font-semibold text-azul">Marcenaria <EmBreve fase={2} /></p><p className="text-xs text-cinza">A partir do SketchUp, com o plugin exportador. Em construção.</p></div>
+            <form action={novaMarcenaria} className="cartao"><input type="hidden" name="projetoId" value={p.id} />
+              <p className="font-semibold text-azul">Marcenaria</p>
+              <p className="mb-3 text-xs text-cinza">Pelo SketchUp (plugin exportador) ou pela planta com cotas. Saem as pranchas de cada móvel, a lista de peças, as ferragens, o plano de corte e a planilha.</p>
+              <button className="botao w-full">Detalhar marcenaria</button>
+            </form>
           </div>
+          {marcenarias.map((mc) => (
+            <div key={mc.id} className="cartao flex flex-wrap items-center gap-3">
+              <div className="grow"><p className="font-semibold text-azul">Marcenaria · {mc.moveis.map((m) => m.nome).join(", ") || (mc.arquivo ? "modelo do SketchUp" : "sem móveis ainda")}</p><p className="text-xs text-cinza">{mc.pdf ? `${mc.verificacao?.folhas ?? 0} folha(s) gerada(s)` : "ainda não gerada"} · atualizado em {dataBR(mc.atualizadoEm)}</p></div>
+              {mc.pdf && <a className="botao-leve" href={`/api/arquivo?c=${encodeURIComponent(mc.pdf)}&ver=1`} target="_blank">PDF</a>}
+              <Link href={`/marcenaria/${mc.id}`} className="botao">Abrir</Link>
+            </div>
+          ))}
           {conjuntos.map((cj) => (
             <div key={cj.id} className="cartao flex flex-wrap items-center gap-3">
               <div className="grow"><p className="font-semibold text-azul">Áreas molhadas · {cj.ambientes.map((a) => a.nome).join(", ") || "sem ambientes ainda"}</p><p className="text-xs text-cinza">{cj.saidas.length} prancha(s) gerada(s) · atualizado em {dataBR(cj.atualizadoEm)}</p></div>

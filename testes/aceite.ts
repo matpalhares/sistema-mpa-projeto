@@ -145,6 +145,45 @@ async function imagensPorPagina(pdf: Buffer): Promise<{ imagens: number[]; texto
   const bd = bancadaDoAmbiente(EXEMPLOS.bwc1, 0, RESP());
   conferir("laterais da bancada saem da planta, sem perguntar (BWC 1: esquerda aberta, direita na parede)", bd.lateralEsquerda === "aberta" && bd.lateralDireita === "parede" && bd.comprimento === 0.95);
 
+  console.log("Marcenaria (SketchUp e móvel por medidas)");
+  const { gerarMarcenaria } = await import("../src/lib/servicos");
+  const { salvarArquivo } = await import("../src/lib/arquivos");
+  const MC = await import("../src/lib/marcenaria/modelo");
+  const EX = await import("./exemplo-marcenaria");
+  const novaMarc = (x: object) => salvar("marcenarias", { empresaId: "mpa", projetoId: "x", arquivo: null, papeis: {}, moveis: [], planta: null, pdf: null, xlsx: null, verificacao: null, respostas: EX.RESP_MARC(), ...x } as never);
+  await salvarArquivo("mpa/teste/balcao_marcenaria.json", Buffer.from(JSON.stringify(EX.modeloSketchUp())));
+  const sk = MC.moveisDoModelo(EX.modeloSketchUp())[0], refm = MC.movelPorMedidas(EX.BALCAO, EX.RESP_MARC());
+  const contar = (m: { pecas: { papel: string }[] }) => JSON.stringify(MC.PAPEIS.map((k) => m.pecas.filter((x) => x.papel === k).length));
+  conferir("modelo girado e fora da origem: acha a frente e as medidas (1800 x 550 x 850)", sk.L === 1800 && sk.P === 550 && sk.A === 850);
+  conferir("peças sem nome: tipo deduzido pela posição igual ao do móvel de referência", contar(sk) === contar(refm), contar(sk));
+  conferir("ferragem modelada não vira chapa", sk.explicitas.some((x) => x.nome.includes("Corrediça")) && !sk.pecas.some((x) => x.papel === "ferragem"));
+  const sr = await gerarMarcenaria(mpa, (await novaMarc({ arquivo: "mpa/teste/balcao_marcenaria.json", moveis: [MC.movelParamNovo(1)], respostas: MC.respostasMarcenariaIniciais() })).id);
+  const pm = sr.ok ? "" : sr.erros.join(" | ");
+  conferir("sem respostas, não gera e pergunta MDF, acabamento, veio, puxador, corrediça, dobradiça e o móvel", !sr.ok && ["espessura do MDF", "acabamento", "veio", "puxador", "corrediça", "dobradiça", "tem rodapé", "portas, de gavetas ou aberto"].every((x) => pm.includes(x)), pm.slice(0, 120));
+  conferir("sem a conferência marcada, não gera", !(await gerarMarcenaria(mpa, (await novaMarc({ moveis: [EX.BALCAO], respostas: EX.RESP_MARC({ conferido: false }) })).id)).ok);
+  conferir("bloqueia módulos que não fecham com a largura", !(await gerarMarcenaria(mpa, (await novaMarc({ moveis: [{ ...EX.BALCAO, modulos: EX.BALCAO.modulos.map((x) => ({ ...x, largura: 900 })) }] })).id)).ok);
+  const gm = await gerarMarcenaria(mpa, (await novaMarc({ arquivo: "mpa/teste/balcao_marcenaria.json", moveis: [EX.ROUPEIRO] })).id);
+  conferir("gera pranchas (PDF) e planilha (XLSX)", gm.ok && !!gm.dados?.pdf && !!gm.dados?.xlsx, gm.ok ? "" : gm.erros.join("; "));
+  if (gm.ok) {
+    conferir("nenhum texto ou cota sobreposto", gm.dados!.verificacao!.sobreposicoes === 0, String(gm.dados!.verificacao!.sobreposicoes));
+    const pg = await imagensPorPagina((await lerArquivo(gm.dados!.pdf!))!), tm = pg.texto.join(" ");
+    conferir("folhas numeradas e nenhuma em branco", pg.texto.length === gm.dados!.verificacao!.folhas && pg.texto.every((t, i) => t.includes(`FOLHA ${String(i + 1).padStart(2, "0")}/${String(pg.texto.length).padStart(2, "0")}`) && t.length > 250));
+    conferir("tem visão geral, vista interna, cortes, explodida, cartões, lista, ferragens e plano de corte", ["VISTA FRONTAL", "VISTA INTERNA", "CORTE A-A", "CORTE B-B", "VISTA EXPLODIDA", "CARTÕES DE FABRICAÇÃO", "LISTA DE PEÇAS", "FERRAGENS", "RESUMO DE MATERIAIS", "PLANO DE CORTE"].every((x) => tm.replace(/\s/g, "").includes(x.replace(/\s/g, ""))));
+    conferir("móvel por medidas sai marcado como ESTIMATIVA; o do SketchUp, não", pg.texto.some((t) => t.includes("Roupeiro") && t.includes("ESTIMATIVA: PEÇAS GERADAS POR REGRA")) && !pg.texto[0].includes("ESTIMATIVA"));
+    conferir("aviso de conferir medidas no local e padrões de mercado", tm.includes("CONFERIR MEDIDAS NO LOCAL") && tm.includes("conferir com o catálogo do fornecedor"));
+    conferir("planilha é um XLSX de verdade", (await lerArquivo(gm.dados!.xlsx!))!.subarray(0, 2).toString() === "PK");
+  }
+  const itensT = MC.listaDePecas([refm, MC.movelPorMedidas(EX.ROUPEIRO, EX.RESP_MARC())], EX.RESP_MARC());
+  for (const veio of [true, false]) {
+    const pl = MC.planoDeCorte(itensT, veio), W = 2730, H = 1820;
+    const dentro = pl.chapas.every((c) => c.pecas.every((x) => x.x >= 0 && x.y >= 0 && x.x + x.c <= W + 0.01 && x.y + x.l <= H + 0.01));
+    const livre = pl.chapas.every((c) => c.pecas.every((a, i) => c.pecas.every((b, j) => j <= i || a.x + a.c <= b.x + 0.01 || b.x + b.c <= a.x + 0.01 || a.y + a.l <= b.y + 0.01 || b.y + b.l <= a.y + 0.01)));
+    const todas = pl.chapas.reduce((n, c) => n + c.pecas.length, 0) === itensT.reduce((n, it) => n + it.qtd, 0);
+    conferir(`plano de corte ${veio ? "com" : "sem"} veio: todas as peças dentro da chapa, sem se sobrepor${veio ? " e sem girar" : ""}`, dentro && livre && todas && pl.fora.length === 0 && (!veio || pl.chapas.every((c) => c.pecas.every((x) => !x.girada))));
+  }
+  conferir("dobradiças pela altura da porta (2, 3, 4, 5)", [800, 1500, 2000, 2400].map(MC.dobradicasPorAltura).join() === "2,3,4,5");
+  conferir("corrediça: maior padrão que cabe na profundidade menos 50 mm", MC.corredicaPara(550) === 500 && MC.corredicaPara(420) === 350);
+
   console.log(falhas ? `\n${falhas} FALHA(S)` : "\nTodos os testes passaram.");
   process.exit(falhas ? 1 : 0);
 })();

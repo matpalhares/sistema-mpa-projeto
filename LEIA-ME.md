@@ -61,3 +61,13 @@ Os dados da pasta `dados` não migram sozinhos para o Supabase.
 
 - **Fase 2 (em andamento):** marcenaria com o plugin do SketchUp; cozinhas e copas com equipamentos e banheiros com cabines no executivo; barras do lavatório acessível.
 - **Fase 3:** gestão da obra (cronograma, relatório fotográfico, comparativo, financeiro e recibos).
+
+
+## Marcenaria
+
+Na aba Detalhamentos do projeto, "Detalhar marcenaria". Dois caminhos, que podem ser usados juntos:
+
+1. **SketchUp (exato):** baixe o plugin `public/plugin/MPA_exportar_marcenaria.rb` (o link está na própria tela), rode no SketchUp, e envie o arquivo `*_marcenaria.json`. As peças e medidas saem do modelo. Nomeie as peças no SketchUp (Lateral, Base, Topo, Fundo, Divisoria, Prateleira, Porta, Frente_Gaveta...); peça sem nome reconhecido tem o tipo deduzido pela posição e fica em amarelo para você conferir.
+2. **Planta com cotas (estimativa):** o sistema lê os ambientes e a escala do PDF, você mede o móvel com dois cliques e responde portas, gavetas, prateleiras, rodapé e fundo. As peças saem por regra e a prancha avisa "ESTIMATIVA".
+
+O sistema pergunta espessura e cor do MDF, veio, portas sobrepostas ou embutidas, puxador, corrediça e dobradiça, e só gera depois de tudo respondido e conferido. Saem: pranchas A4 por móvel (visão geral, vista interna e cortes, explodida, cartões de fabricação), lista de peças, ferragens, resumo de materiais, plano de corte (sugestão) e a planilha Excel. Valores de ferragem (caneco, sistema 32, corrediça etc.) são padrões de mercado: conferir no catálogo do fornecedor.

@@ -4,15 +4,17 @@ import { redirect } from "next/navigation";
 import { listar, obter, salvar } from "@/lib/banco";
 import { lerArquivo, removerArquivo, salvarArquivo, nomeSeguro } from "@/lib/arquivos";
 import { conferirSenha, contexto, criarSessao, definirEmpresa, encerrarSessao, hashSenha, semear } from "@/lib/sessao";
-import type { ConjuntoMolhadas, Detalhamento, Cliente, DadosMemorial, DadosProposta, Empresa, Marca, Memorial, Projeto, Proposta, StatusProposta, TipoMemorial, Usuario } from "@/lib/tipos";
+import type { ConjuntoMarcenaria, MovelLido, PlantaMarcenaria, RecorteMarcenaria, ConjuntoMolhadas, Detalhamento, Cliente, DadosMemorial, DadosProposta, Empresa, Marca, Memorial, Projeto, Proposta, StatusProposta, TipoMemorial, Usuario } from "@/lib/tipos";
 import { propostaInicial } from "@/lib/documentos/textos-proposta";
 import { memorialInicial } from "@/lib/documentos/regras-memorial";
-import { gerarConjuntoMolhadas, gerarMarmoraria, gerarMemorial, gerarProposta, type Resultado } from "@/lib/servicos";
+import { gerarMarcenaria, moveisDoArquivo, gerarConjuntoMolhadas, gerarMarmoraria, gerarMemorial, gerarProposta, type Resultado } from "@/lib/servicos";
 import { NBR9050_PADRAO, respostasIniciais, type Ambiente, type ParametroNBR, type RespostasAmbiente } from "@/lib/pranchas/ambiente";
 import { bancadaInicial, type DadosBancada } from "@/lib/pranchas/regras-bancada";
 import { iaDisponivel, lerAreasMolhadas, lerPlanta, type LeituraPlanta } from "@/lib/ia";
 import { faltaNaMarca } from "@/lib/marca";
 import { lerPlantaVetorial, recortarAmbientes } from "@/lib/leitura-vetorial";
+import { listaDePecas, respostasMarcenariaIniciais, type RespostasMarcenaria } from "@/lib/marcenaria/modelo";
+import { renderizar } from "@/lib/pranchas/iso";
 
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const num = (v: string): number | null => {
@@ -361,6 +363,97 @@ export async function salvarEGerarConjuntoMolhadas(id: string, dados: { planta: 
   const s = await salvarConjuntoMolhadas(id, dados);
   if (!s.ok) return s;
   const r = await gerarConjuntoMolhadas(empresa, id);
+  revalidatePath("/", "layout");
+  return r;
+}
+
+// ---------- MARCENARIA ----------
+export async function novaMarcenaria(f: FormData) {
+  const { empresa } = await contexto();
+  const p = await obter<Projeto>("projetos", txt(f, "projetoId"), empresa.id);
+  if (!p) redirect("/");
+  const c = await obter<Cliente>("clientes", p.clienteId, empresa.id);
+  const json = p.arquivos.find((a) => /\.json$/i.test(a.nome));
+  const cj = await salvar<ConjuntoMarcenaria>("marcenarias", {
+    empresaId: empresa.id, projetoId: p.id, arquivo: json?.caminho ?? null, papeis: {}, moveis: [], planta: null, pdf: null, xlsx: null, verificacao: null,
+    respostas: respostasMarcenariaIniciais({ cliente: c?.nome ?? "", local: [p.endereco, p.municipio].filter(Boolean).join(", ") }),
+  });
+  redirect(`/marcenaria/${cj.id}`);
+}
+
+type DadosMarcenaria = Pick<ConjuntoMarcenaria, "arquivo" | "papeis" | "moveis" | "planta" | "respostas">;
+
+// Lê o arquivo exportado do SketchUp: móveis, medidas, lista de peças e uma perspectiva de cada móvel para conferir.
+export async function lerModeloMarcenaria(id: string, arquivo: string, papeis: ConjuntoMarcenaria["papeis"], respostas: RespostasMarcenaria): Promise<Resultado<MovelLido[]>> {
+  const { empresa } = await contexto();
+  const cj = await obter<ConjuntoMarcenaria>("marcenarias", id, empresa.id);
+  const p = cj && (await obter<Projeto>("projetos", cj.projetoId, empresa.id));
+  if (!cj || !p?.arquivos.some((a) => a.caminho === arquivo)) return { ok: false, erros: ["Arquivo não encontrado no projeto."] };
+  const lido = await moveisDoArquivo({ arquivo, papeis });
+  if (lido.erro) return { ok: false, erros: [lido.erro] };
+  const itens = listaDePecas(lido.moveis, respostas), saida: MovelLido[] = [];
+  for (const [i, m] of lido.moveis.entries()) {
+    let previa: string | null = null;
+    try {
+      const png = (await renderizar(m.pecas.filter((x) => x.papel !== "ferragem").map((x) => ({ min: [x.x0 / 1000, x.y0 / 1000, x.z0 / 1000] as [number, number, number], max: [x.x1 / 1000, x.y1 / 1000, x.z1 / 1000] as [number, number, number], cor: x.cor })), 520, 360)).png;
+      previa = `${empresa.id}/marcenarias/${cj.id}/previa_${i + 1}.png`; await salvarArquivo(previa, png, "image/png");
+    } catch { previa = null; }
+    saida.push({ nome: m.nome, L: m.L, P: m.P, A: m.A, avisos: m.avisos, previa, itens: itens.filter((it) => it.movel === m.nome) });
+  }
+  return { ok: true, dados: saida };
+}
+
+// Lê a planta (texto e traço do PDF): nomes dos ambientes e escala, para medir os móveis clicando em cima.
+async function plantaDaMarcenaria(id: string, caminho: string) {
+  const { empresa } = await contexto();
+  const cj = await obter<ConjuntoMarcenaria>("marcenarias", id, empresa.id);
+  const p = cj && (await obter<Projeto>("projetos", cj.projetoId, empresa.id));
+  const arq = p?.arquivos.find((a) => a.caminho === caminho);
+  if (!cj || !arq) return { erro: "Planta não encontrada no projeto." };
+  if (!/\.pdf$/i.test(arq.nome)) return { erro: "Para ler a planta sem a chave da API, envie o PDF exportado direto do programa de desenho. Com imagem, digite as medidas de cada móvel." };
+  const buf = await lerArquivo(caminho);
+  if (!buf) return { erro: "Não consegui abrir o arquivo." };
+  try { return { empresa, cj, buf, l: await lerPlantaVetorial(buf) }; } catch (e) { return { erro: "Não consegui ler esta planta: " + (e instanceof Error ? e.message : "erro desconhecido") + " Digite as medidas de cada móvel." }; }
+}
+
+export async function prepararPlantaMarcenaria(id: string, caminho: string): Promise<Resultado<PlantaMarcenaria>> {
+  const r = await plantaDaMarcenaria(id, caminho);
+  if ("erro" in r) return { ok: false, erros: [r.erro!] };
+  const ambientes = [...new Set(r.l.rotulos.map((x) => x.nome))];
+  if (ambientes.length === 0) return { ok: false, erros: [(r.l.motivo ?? "Não encontrei nomes de ambientes escritos nesta planta.") + " Digite o ambiente e as medidas de cada móvel."] };
+  const observacao = r.l.ptPorM ? "Escala encontrada: dá para medir os móveis clicando em cima da planta." : "Li os nomes dos ambientes, mas não achei a escala desta planta com segurança: digite as medidas de cada móvel (use as cotas da planta).";
+  return { ok: true, dados: { arquivo: caminho, ambientes, temEscala: !!r.l.ptPorM, observacao } };
+}
+
+// Recorte da planta em volta de um ambiente (5 m para cada lado do nome), para medir o móvel com dois cliques.
+export async function recortarAmbienteMarcenaria(id: string, caminho: string, ambiente: string): Promise<Resultado<RecorteMarcenaria>> {
+  const r = await plantaDaMarcenaria(id, caminho);
+  if ("erro" in r) return { ok: false, erros: [r.erro!] };
+  const rot = r.l.rotulos.find((x) => x.nome === ambiente), pt = r.l.ptPorM;
+  if (!rot || !pt) return { ok: false, erros: ["Não achei este ambiente ou a escala na planta. Digite as medidas do móvel."] };
+  const raio = 5 * pt - 0.6 * pt; // a função de recorte acrescenta 0,6 m de margem
+  const [c] = await recortarAmbientes(r.buf, [{ caixa: { x1: rot.x - raio, y1: rot.y - raio, x2: rot.x + raio, y2: rot.y + raio }, ptPorM: pt }], 110);
+  const imagem = `${r.empresa.id}/marcenarias/${r.cj.id}/recorte_${nomeSeguro(ambiente)}.png`;
+  await salvarArquivo(imagem, c.png, "image/png");
+  return { ok: true, dados: { imagem, largura: c.largura, altura: c.altura, pxPorM: c.pxPorM } };
+}
+
+export async function salvarMarcenaria(id: string, dados: DadosMarcenaria): Promise<Resultado> {
+  const { empresa } = await contexto();
+  const cj = await obter<ConjuntoMarcenaria>("marcenarias", id, empresa.id);
+  if (!cj) return { ok: false, erros: ["Marcenaria não encontrada."] };
+  const p = await obter<Projeto>("projetos", cj.projetoId, empresa.id);
+  const arquivo = dados.arquivo && p?.arquivos.some((a) => a.caminho === dados.arquivo) ? dados.arquivo : null;
+  await salvar<ConjuntoMarcenaria>("marcenarias", { ...cj, arquivo, papeis: dados.papeis, moveis: dados.moveis, planta: dados.planta, respostas: dados.respostas });
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function salvarEGerarMarcenaria(id: string, dados: DadosMarcenaria): Promise<Resultado<ConjuntoMarcenaria>> {
+  const { empresa } = await contexto();
+  const s = await salvarMarcenaria(id, dados);
+  if (!s.ok) return s;
+  const r = await gerarMarcenaria(empresa, id);
   revalidatePath("/", "layout");
   return r;
 }

@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const arq = f.get("arquivo");
   if (!p || !(arq instanceof File) || arq.size === 0) return NextResponse.json({ erro: "Envio inválido." }, { status: 400 });
   const cat = String(f.get("categoria") ?? "outro");
-  const categoria = (["planta", "sketchup", "contrato", "outro"].includes(cat) ? cat : "outro") as ArquivoRef["categoria"];
+  const categoria = (/_marcenaria\.json$/i.test(arq.name) ? "sketchup" : ["planta", "sketchup", "contrato", "outro"].includes(cat) ? cat : "outro") as ArquivoRef["categoria"]; // o arquivo do plugin MPA é sempre SketchUp
   const caminho = `${empresa.id}/projetos/${p.id}/${Date.now()}_${nomeSeguro(arq.name)}`;
   await salvarArquivo(caminho, Buffer.from(await arq.arrayBuffer()), arq.type || undefined);
   const ref: ArquivoRef = { nome: arq.name, caminho, tamanho: arq.size, enviadoEm: new Date().toISOString(), categoria };

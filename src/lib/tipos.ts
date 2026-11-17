@@ -254,4 +254,24 @@ export interface ConjuntoMolhadas {
   atualizadoEm: string;
 }
 
+// Marcenaria: móveis do SketchUp (arquivo do exportador) e móveis descritos por medidas (planta com cotas).
+export interface PlantaMarcenaria { arquivo: string; ambientes: string[]; temEscala: boolean; observacao: string }
+export interface RecorteMarcenaria { imagem: string; largura: number; altura: number; pxPorM: number }
+export interface MovelLido { nome: string; L: number; P: number; A: number; avisos: string[]; previa: string | null; itens: import("./marcenaria/modelo").ItemLista[] }
+export interface ConjuntoMarcenaria {
+  id: Id;
+  empresaId: Id;
+  projetoId: Id;
+  arquivo: string | null; // JSON exportado do SketchUp
+  papeis: Record<string, import("./marcenaria/modelo").Papel>; // correções do tipo de peça feitas pelo usuário
+  moveis: import("./marcenaria/modelo").MovelParam[]; // móveis por medidas
+  planta: PlantaMarcenaria | null;
+  respostas: import("./marcenaria/modelo").RespostasMarcenaria;
+  pdf: string | null;
+  xlsx: string | null;
+  verificacao: VerificacaoPrancha | null;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
 export const A_DEFINIR = "a definir";

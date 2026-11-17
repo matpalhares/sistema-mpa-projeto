@@ -1,7 +1,7 @@
 // Regras de negócio usadas pelas ações e pelos testes (sem depender de cookies).
 import { obter, salvar } from "./banco";
 import { salvarArquivo, nomeSeguro } from "./arquivos";
-import type { ConjuntoMolhadas, Detalhamento, Empresa, SaidaPrancha, Memorial, Proposta, TipoMemorial } from "./tipos";
+import type { ConjuntoMarcenaria, ConjuntoMolhadas, Detalhamento, Empresa, SaidaPrancha, Memorial, Proposta, TipoMemorial } from "./tipos";
 import { lerArquivo } from "./arquivos";
 import { gerarPranchaMarmoraria } from "./pranchas/marmoraria";
 import { errosBancada, perguntasEmAberto } from "./pranchas/regras-bancada";
@@ -100,5 +100,40 @@ export async function gerarConjuntoMolhadas(empresa: Empresa, id: string): Promi
     }
   }
   const novo = await salvar<ConjuntoMolhadas>("molhadas", { ...cj, saidas, avisos: [...new Set(avisos)] });
+  return { ok: true, dados: novo };
+}
+
+// Marcenaria: junta os móveis do SketchUp e os móveis por medidas. Enquanto houver pergunta sem resposta, não gera.
+import { avisosMarcenaria, errosDoMovelParam, espCaixaMm, ferragens, moveisDoModelo, movelPorMedidas, perguntasMarcenaria, validarModelo, type Movel } from "./marcenaria/modelo";
+import { gerarPranchasMarcenaria } from "./pranchas/marcenaria";
+import { planilhaMarcenaria } from "./marcenaria/planilha";
+
+export async function moveisDoArquivo(cj: Pick<ConjuntoMarcenaria, "arquivo" | "papeis">): Promise<{ moveis: Movel[]; erro?: string }> {
+  if (!cj.arquivo) return { moveis: [] };
+  const buf = await lerArquivo(cj.arquivo);
+  if (!buf) return { moveis: [], erro: "Não consegui abrir o arquivo do SketchUp." };
+  let j: unknown; try { j = JSON.parse(buf.toString("utf8").replace(/^\uFEFF/, "")); } catch { return { moveis: [], erro: "O arquivo não é um JSON válido. Envie o arquivo gerado pelo plugin MPA no SketchUp (termina em _marcenaria.json)." }; }
+  const v = validarModelo(j);
+  if (!v.ok) return { moveis: [], erro: v.erro };
+  return { moveis: moveisDoModelo(v.modelo, cj.papeis).filter((m) => m.pecas.length) };
+}
+
+export async function gerarMarcenaria(empresa: Empresa, id: string): Promise<Resultado<ConjuntoMarcenaria>> {
+  const cj = await obter<ConjuntoMarcenaria>("marcenarias", id, empresa.id);
+  if (!cj) return { ok: false, erros: ["Marcenaria não encontrada."] };
+  const lido = await moveisDoArquivo(cj);
+  if (lido.erro) return { ok: false, erros: [lido.erro] };
+  if (lido.moveis.length + cj.moveis.length === 0) return { ok: false, erros: ["Nenhum móvel ainda. Envie o arquivo do SketchUp ou adicione um móvel por medidas."] };
+  const abertas = perguntasMarcenaria(cj.respostas, lido.moveis, cj.moveis);
+  if (abertas.length) return { ok: false, erros: abertas.map((p) => "Responda antes de gerar: " + p) };
+  const erros = [...marcaPronta(empresa), ...cj.moveis.flatMap((m) => errosDoMovelParam(m, espCaixaMm(cj.respostas) ?? 18))];
+  if (!cj.respostas.conferido) erros.push("Confira os móveis e a lista de peças e marque a caixa de conferência antes de gerar.");
+  if (erros.length) return { ok: false, erros };
+  const moveis = [...lido.moveis, ...cj.moveis.map((m) => movelPorMedidas(m, cj.respostas))];
+  const r = await gerarPranchasMarcenaria(empresa, moveis, cj.respostas);
+  const base = `${empresa.id}/marcenarias/${cj.id}/Marcenaria_${nomeSeguro(cj.respostas.cliente || "cliente")}_R${String(cj.respostas.revisao).padStart(2, "0")}`;
+  await salvarArquivo(base + ".pdf", r.pdf, "application/pdf");
+  await salvarArquivo(base + ".xlsx", await planilhaMarcenaria(r.itens, ferragens(moveis, cj.respostas), r.chapas), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  const novo = await salvar<ConjuntoMarcenaria>("marcenarias", { ...cj, pdf: base + ".pdf", xlsx: base + ".xlsx", verificacao: { folhas: r.folhas, sobreposicoes: r.sobreposicoes.length, avisos: [...new Set([...avisosMarcenaria(moveis, cj.respostas), ...r.avisos])] } });
   return { ok: true, dados: novo };
 }
