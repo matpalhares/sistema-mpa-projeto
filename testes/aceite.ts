@@ -134,6 +134,9 @@ async function imagensPorPagina(pdf: Buffer): Promise<{ imagens: number[]; texto
     conferir("pontos padrão: lavatório AF 0,60 / ES 0,50 e vaso AF 0,25", tx.includes("AF 0,60") && tx.includes("ES 0,50") && tx.includes("AF 0,25"));
     conferir("barras citam a NBR 9050:2020, item 7.7.2.2", tx.includes("NBR 9050:2020") && tx.includes("7.7.2.2"));
   }
+  const selec = await gerarConjuntoMolhadas(mpa, (await novoCj([EXEMPLOS.bwc1, { ...EXEMPLOS.bwc2pne, incluir: false, acessivel: "" }], RESP())).id);
+  conferir("só os ambientes marcados saem: o desmarcado não gera prancha nem entra nas perguntas", selec.ok && selec.dados!.saidas.filter((x) => x.tipo === "executivo").length === 1 && selec.dados!.saidas.every((x) => !x.nome.includes("BWC 2")));
+  conferir("sem nenhum ambiente marcado, não gera", !(await gerarConjuntoMolhadas(mpa, (await novoCj([{ ...EXEMPLOS.bwc1, incluir: false }], RESP())).id)).ok);
   const bb = barrasDoAmbiente(EXEMPLOS.bwc2pne, nbr(), true).barras, perto = (x: number, y: number) => Math.abs(x - y) < 0.006;
   const bf = bb.find((x) => x.tipo === "fundo")!, bl = bb.find((x) => x.tipo === "lateral")!, bv = bb.find((x) => x.tipo === "vertical")!;
   conferir("NBR 9050 fundo: 0,80 m, passa 0,30 m do eixo para a parede lateral, a 0,89 m com caixa acoplada", bf.parede === "S" && perto(bf.de, 0.48) && perto(bf.ate, 1.28) && perto(bf.z1, 0.89));

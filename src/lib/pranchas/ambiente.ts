@@ -18,6 +18,7 @@ export interface RecortePlanta { imagem: string; largura: number; altura: number
 
 export interface Ambiente {
   recorte?: RecortePlanta | null;
+  incluir?: boolean; // false = o usuário não quer detalhar este ambiente (vazio = detalhar)
   nome: string;
   largura: number; // x (leste-oeste)
   comprimento: number; // y (norte-sul)
@@ -150,6 +151,8 @@ export function respostasIniciais(base: Partial<RespostasAmbiente> = {}): Respos
     cliente: "", local: "", data: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10), revisao: 0, origemPlanta: "", modeloConferido: false, ...base,
   };
 }
+
+export const ativos = (l: Ambiente[]) => l.filter((a) => a.incluir !== false);
 
 export function perguntasDoAmbiente(a: Ambiente, r: RespostasAmbiente): string[] {
   const p: string[] = [];

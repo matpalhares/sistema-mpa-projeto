@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { lerAmbientesDaPlanta, salvarConjuntoMolhadas, salvarEGerarConjuntoMolhadas } from "@/app/acoes";
-import { TIPOS_BOX, TIPOS_CHUVEIRO, TIPOS_VASO, errosDoAmbiente, perguntasDoAmbiente, type Ambiente, type ParametroNBR, type Parede, type RespostasAmbiente } from "@/lib/pranchas/ambiente";
+import { TIPOS_BOX, TIPOS_CHUVEIRO, TIPOS_VASO, ativos, errosDoAmbiente, perguntasDoAmbiente, type Ambiente, type ParametroNBR, type Parede, type RespostasAmbiente } from "@/lib/pranchas/ambiente";
 import { PEDRAS, TIPOS_CUBA, TIPOS_TORNEIRA } from "@/lib/pranchas/regras-bancada";
 import type { ArquivoRef, ConjuntoMolhadas, SaidaPrancha } from "@/lib/tipos";
 import { PreviaAmbiente } from "./PreviaAmbiente";
@@ -63,15 +63,16 @@ export function EditorMolhadas({ cj, plantas, iaLigada, marcaDefinida, sigla }: 
   const ambSemDesconferir = (i: number, patch: Partial<Ambiente>) => { setAmbientes((l) => l.map((a, k) => (k === i ? { ...a, ...patch } : a))); mexeu(); };
 
   const dados = () => ({ planta: planta || null, ambientes, respostas: r, parametros });
-  const abertas = [...new Set(ambientes.flatMap((a) => perguntasDoAmbiente(a, r)))];
+  const escolhidos = ativos(ambientes);
+  const abertas = [...new Set(escolhidos.flatMap((a) => perguntasDoAmbiente(a, r)))];
   const bloqueios = [
-    ...(ambientes.length === 0 ? ["Leia a planta ou adicione um ambiente."] : []),
-    ...(abertas.length ? [] : [...new Set(ambientes.flatMap((a) => errosDoAmbiente(a, r)))]),
+    ...(ambientes.length === 0 ? ["Leia a planta ou adicione um ambiente."] : escolhidos.length === 0 ? ["Marque ao menos um ambiente para detalhar."] : []),
+    ...(abertas.length ? [] : [...new Set(escolhidos.flatMap((a) => errosDoAmbiente(a, r)))]),
     ...(marcaDefinida ? [] : [`A marca da ${sigla} está a definir. Cadastre em Empresas e marcas para gerar o documento.`]),
   ];
-  const temBancada = ambientes.some((a) => a.bancadas.length), temCuba = ambientes.some((a) => a.bancadas.some((b) => b.cubas.length));
-  const temVaso = ambientes.some((a) => a.vasos.length), temChuveiro = ambientes.some((a) => a.chuveiro), temBox = ambientes.some((a) => a.box);
-  const temPNE = ambientes.some((a) => a.acessivel === "sim");
+  const temBancada = escolhidos.some((a) => a.bancadas.length), temCuba = escolhidos.some((a) => a.bancadas.some((b) => b.cubas.length));
+  const temVaso = escolhidos.some((a) => a.vasos.length), temChuveiro = escolhidos.some((a) => a.chuveiro), temBox = escolhidos.some((a) => a.box);
+  const temPNE = escolhidos.some((a) => a.acessivel === "sim");
 
   const ler = () => iniciar(async () => {
     setErros([]); setLeitura("");
@@ -106,12 +107,33 @@ export function EditorMolhadas({ cj, plantas, iaLigada, marcaDefinida, sigla }: 
           <button type="button" className="botao-leve" onClick={() => { setAmbientes((l) => [...l, novoAmbiente(l.length + 1)]); setR((x) => ({ ...x, modeloConferido: false })); mexeu(); }}>+ Adicionar ambiente à mão</button>
         </section>
 
+        {ambientes.length > 0 && (
+          <section className="cartao space-y-2" aria-label="Quais ambientes detalhar">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="titulo grow text-sm">Quais ambientes detalhar? ({escolhidos.length} de {ambientes.length})</h2>
+              <button type="button" className="botao-leve" onClick={() => { setAmbientes((l) => l.map((a) => ({ ...a, incluir: true }))); mexeu(); }}>Marcar todos</button>
+              <button type="button" className="botao-leve" onClick={() => { setAmbientes((l) => l.map((a) => ({ ...a, incluir: false }))); mexeu(); }}>Desmarcar todos</button>
+            </div>
+            <p className="text-xs text-cinza">Só os marcados entram nas perguntas e nas pranchas. Os desmarcados ficam guardados, sem apagar.</p>
+            <div className="flex flex-wrap gap-2">
+              {ambientes.map((a, i) => (
+                <label key={i} className={"opcao flex cursor-pointer items-center gap-2 " + (a.incluir !== false ? "opcao-ativa" : "")}>
+                  <input type="checkbox" checked={a.incluir !== false} aria-label={`Detalhar ${a.nome}`} onChange={(e) => { setAmbientes((l) => l.map((x, k) => (k === i ? { ...x, incluir: e.target.checked } : x))); mexeu(); }} />
+                  {a.nome}
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+
         {ambientes.map((a, i) => (
-          <section key={`${versao}-${i}`} className="cartao space-y-3">
+          <section key={`${versao}-${i}`} className={"cartao space-y-3" + (a.incluir === false ? " opacity-60" : "")}>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="titulo grow text-sm">Ambiente: <input className="campo ml-1 inline w-48 py-1 font-semibold" value={a.nome} aria-label={`Nome do ambiente ${i + 1}`} onChange={(e) => ambSemDesconferir(i, { nome: e.target.value })} /></h2>
               <button type="button" className="text-sm text-vermelho underline" onClick={() => { setAmbientes((l) => l.filter((_, k) => k !== i)); mexeu(); }}>Remover</button>
             </div>
+            {a.incluir === false && <p className="text-sm text-cinza">Este ambiente não será detalhado. Marque a caixa no topo para incluí-lo.</p>}
+            <div className={a.incluir === false ? "hidden" : "space-y-3"}>
             {a.recorte && <MarcarNaPlanta a={a} aoMudar={(patch) => amb(i, patch)} />}
             <div className="flex flex-wrap gap-4">
               <div><p className="mb-1 text-xs text-cinza">Como vai para a prancha:</p><PreviaAmbiente a={a} /></div>
@@ -177,6 +199,7 @@ export function EditorMolhadas({ cj, plantas, iaLigada, marcaDefinida, sigla }: 
                 {a.ralo ? <><Num rotulo="Ralo: distância da esquerda" valor={a.ralo.x} aoMudar={(v) => amb(i, { ralo: { ...a.ralo!, x: v } })} /><Num rotulo="Ralo: distância de cima" valor={a.ralo.y} aoMudar={(v) => amb(i, { ralo: { ...a.ralo!, y: v } })} /><button type="button" className="botao-leve py-1" onClick={() => amb(i, { ralo: null })}>Tirar ralo</button></> : <button type="button" className="botao-leve py-1" onClick={() => amb(i, { ralo: { x: 0.2, y: 0.2 } })}>+ Ralo</button>}
               </div>
             </details>
+            </div>
           </section>
         ))}
 

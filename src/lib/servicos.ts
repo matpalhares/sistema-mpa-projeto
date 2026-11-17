@@ -6,7 +6,7 @@ import { lerArquivo } from "./arquivos";
 import { gerarPranchaMarmoraria } from "./pranchas/marmoraria";
 import { errosBancada, perguntasEmAberto } from "./pranchas/regras-bancada";
 import { gerarExecutivo } from "./pranchas/executivo";
-import { bancadaDoAmbiente, errosDoAmbiente, nbr, perguntasDoAmbiente } from "./pranchas/ambiente";
+import { ativos, bancadaDoAmbiente, errosDoAmbiente, nbr, perguntasDoAmbiente } from "./pranchas/ambiente";
 import { faltaNaMarca } from "./marca";
 import { converterParaPdf, verificar } from "./documentos/comum";
 import { errosProposta, gerarPropostaDocx } from "./documentos/proposta";
@@ -76,14 +76,16 @@ export async function gerarMarmoraria(empresa: Empresa, id: string): Promise<Res
 export async function gerarConjuntoMolhadas(empresa: Empresa, id: string): Promise<Resultado<ConjuntoMolhadas>> {
   const cj = await obter<ConjuntoMolhadas>("molhadas", id, empresa.id);
   if (!cj) return { ok: false, erros: ["Conjunto não encontrado."] };
+  const escolhidos = ativos(cj.ambientes);
   if (cj.ambientes.length === 0) return { ok: false, erros: ["Nenhum ambiente ainda. Leia a planta ou adicione um ambiente."] };
-  const abertas = [...new Set(cj.ambientes.flatMap((a) => perguntasDoAmbiente(a, cj.respostas)))];
+  if (escolhidos.length === 0) return { ok: false, erros: ["Nenhum ambiente está marcado para detalhar. Marque ao menos um."] };
+  const abertas = [...new Set(escolhidos.flatMap((a) => perguntasDoAmbiente(a, cj.respostas)))];
   if (abertas.length) return { ok: false, erros: abertas.map((p) => "Responda antes de gerar: " + p) };
-  const erros = [...marcaPronta(empresa), ...new Set(cj.ambientes.flatMap((a) => errosDoAmbiente(a, cj.respostas)))];
+  const erros = [...marcaPronta(empresa), ...new Set(escolhidos.flatMap((a) => errosDoAmbiente(a, cj.respostas)))];
   if (erros.length) return { ok: false, erros };
   const saidas: SaidaPrancha[] = [], avisos: string[] = [];
-  const total = cj.ambientes.length * 2, pasta = `${empresa.id}/molhadas/${cj.id}`, rev = "R" + String(cj.respostas.revisao).padStart(2, "0");
-  for (const [i, a] of cj.ambientes.entries()) {
+  const total = escolhidos.length * 2, pasta = `${empresa.id}/molhadas/${cj.id}`, rev = "R" + String(cj.respostas.revisao).padStart(2, "0");
+  for (const [i, a] of escolhidos.entries()) {
     const ex = await gerarExecutivo(empresa, a, cj.respostas, { folhaInicial: i * 2 + 1, totalFolhas: total, parametros: nbr(cj.parametros) });
     const caminho = `${pasta}/Executivo_${nomeSeguro(a.nome)}_${rev}.pdf`;
     await salvarArquivo(caminho, ex.pdf, "application/pdf");
