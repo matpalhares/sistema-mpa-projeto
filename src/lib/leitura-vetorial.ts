@@ -17,12 +17,13 @@ export interface LeituraVetorial {
   motivo?: string; // por que não deu para ler
   rotulos: Rotulo[]; // todos os ambientes nomeados (serve ao memorial)
   ambientes: AmbienteVetorial[]; // só áreas molhadas
+  naoLidos?: { nome: string; motivo: string }[]; // nomes achados mas não lidos, com o motivo
   ptPorM: number | null;
   observacoes: string;
   pagina: { largura: number; altura: number };
 }
 
-const MOLHADA = /\b(BWC|B\.?W\.?C\.?|BANH(EIRO)?S?|BANHO|LAVABO|W\.?C\.?|SANIT[ÁA]RIOS?|I\.?S\.?|TOALETE)\b/i;
+const MOLHADA = /\b(BWC|B\.?W\.?C\.?|BANH(EIRO)?S?|BANHO|LAVABO|W\.?C\.?|SANIT[ÁA]RIOS?|I\.?S\.?|TOALETE|COZINHAS?|COPAS?|CANTINA|COZ\.?|LAVANDERIA|[ÁA]REA DE SERVI[ÇC]O|CHURRASQUEIRA|GOURMET|DML)\b/i;
 const NUMERO = /^\d{0,2}[.,]\d{2}$/;
 const mul = (a: M6, b: number[]): M6 => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
 const cm = (v: number) => Math.round(v * 100) / 100;
@@ -152,9 +153,10 @@ export async function lerPlantaVetorial(pdf: Buffer): Promise<LeituraVetorial> {
 
   // ---------- caixa interna de cada ambiente ----------
   interface Caixa { r: Rotulo; x1: number; y1: number; x2: number; y2: number; regular: boolean }
-  const acharCaixas = (S: number | null) => { const caixas: Caixa[] = [];
+  const naoLidos: { nome: string; motivo: string }[] = [];
+  const acharCaixas = (S: number | null) => { const caixas: Caixa[] = []; naoLidos.length = 0;
   for (const r of molhadas) {
-    if (naParede(r.x, r.y)) continue;
+    if (naParede(r.x, r.y)) { naoLidos.push({ nome: r.nome, motivo: 'o nome está escrito em cima de uma parede, não dentro do ambiente' }); continue; }
     // os raios sempre saem de perto do nome do ambiente (que está dentro dele), varrendo a faixa já conhecida
     const d0 = r.alt * 1.5;
     let x1 = r.x - d0, x2 = r.x + d0, y1 = r.y - d0, y2 = r.y + d0, regular = true, falhou = false;
@@ -168,8 +170,8 @@ export async function lerPlantaVetorial(pdf: Buffer): Promise<LeituraVetorial> {
       [x1, x2] = [r.x - esq.valor, r.x + dir.valor];
       regular = Math.min(esq.fracao, dir.fracao, cima.fracao, baixo.fracao) >= 0.85;
     }
-    if (falhou) continue;
-    if (x2 - x1 > 3 && y2 - y1 > 3) caixas.push({ r, x1, y1, x2, y2, regular });
+    if (falhou) { naoLidos.push({ nome: r.nome, motivo: 'não consegui fechar as paredes em volta: ambiente aberto, parede fora do padrão ou nome longe do ambiente' }); continue; }
+    if (x2 - x1 > 3 && y2 - y1 > 3) caixas.push({ r, x1, y1, x2, y2, regular }); else naoLidos.push({ nome: r.nome, motivo: 'o espaço encontrado é pequeno demais' });
   }
   return caixas; };
   let caixas = acharCaixas(null);
@@ -260,7 +262,10 @@ export async function lerPlantaVetorial(pdf: Buffer): Promise<LeituraVetorial> {
   }
   const escala = Math.round(72 / 0.0254 / S);
   const observacoes = `Leitura feita pelo texto e pelo traço do PDF, sem inteligência artificial. Escala do desenho: cerca de 1:${escala}${escalaPorTexto ? " (pela indicação escrita)" : ` (conferida com ${votos} cota(s) escrita(s))`}.`;
-  return { ok: true, ambientes, ptPorM: S, observacoes, ...base };
+  const aviso = naoLidos.length
+    ? ` ATENÇÃO: achei ${molhadas.length} nome(s) de áreas molhadas e li ${ambientes.length}. Não li: ${naoLidos.map((n) => `${n.nome} (${n.motivo})`).join('; ')}. Para esses, use "+ Adicionar ambiente à mão" e digite as medidas da planta.`
+    : ` Li todos os ${ambientes.length} ambiente(s) com nome de área molhada que achei na planta.`;
+  return { ok: true, ambientes, naoLidos: [...naoLidos], ptPorM: S, observacoes: observacoes + aviso, ...base };
 }
 
 // Recortes da planta em PNG, um por ambiente, para o usuário marcar as peças em cima.
